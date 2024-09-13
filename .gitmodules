@@ -1,0 +1,3 @@
+[submodule "parabellum"]
+	path = parabellum
+	url = git@github.com:syrkis/parabellum.git

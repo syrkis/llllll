@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "llllll"
+version = "0.1.0"
+description = ""
+authors = ["Noah Syrkis <noah@syrkis.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12"
+ollama = "^0.3.3"
+ipykernel = "^6.29.5"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
