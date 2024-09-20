@@ -1,85 +1,93 @@
-# main.py
-#    FastAPI app
-# by: Noah Syrkis
-
-
-# Imports ######################################################################
-from fastapi import FastAPI, Cookie, Body
-from fastapi.exceptions import HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from geopandas.geoseries import Dict
-from pydantic import BaseModel
-from typing import Union
-import gymnasium as gym
-from jax import Array, random, tree_util
-import jaxmarl
-from jaxmarl.environments import smax
-import parabellum as pb
-from chex import dataclass
 import uuid
-from typing import Dict, List
-import llllll
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import gymnasium as gym
 
-
-# FastAPI app ##################################################################
 app = FastAPI()
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Svelte dev server port
+    allow_origins=["http://localhost:5173"],  # Add your Svelte app's URL here
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# Game sessions ################################################################
-game_sessions = {}
+# Store active games
+games = {}
 
 
-class GameStartRequest(BaseModel):
-    scenario: str
+class Action(BaseModel):
+    action: int
 
 
-# Functions ####################################################################
-def get_game_session(idx: str):
-    if idx not in game_sessions:
-        raise HTTPException(status_code=404, detail="Game session not found")
-    return game_sessions[idx]
-
-
-def create_cookie(response: JSONResponse, session_id: str):
-    response.set_cookie(key="session_id", value=session_id, httponly=True)
-    return response
-
-
-def jax_to_json(jax_data):
-    return tree_util.tree_map(lambda x: x.tolist(), jax_data)
-
-
-# Routes #######################################################################
-@app.post("/assign_cookie")
-def assign_cookie():
-    session_id = str(uuid.uuid4())
-    response = JSONResponse(content={"session_id": session_id})
-    return create_cookie(response, session_id)
+class GameState(BaseModel):
+    observation: list
+    reward: float
+    terminated: bool
+    truncated: bool
+    info: dict
 
 
 @app.post("/start_game")
-async def start_game(request: GameStartRequest, session_id: str = Cookie(None)):
-    if session_id is None:
-        raise HTTPException(status_code=401, detail="No session_id provided")
+async def start_game():
+    game_id = str(uuid.uuid4())
+    env = gym.make("CartPole-v1")
+    initial_observation, info = env.reset()
+    games[game_id] = {
+        "env": env,
+        "observation": initial_observation.tolist(),
+        "info": info,
+    }
+    return {
+        "game_id": game_id,
+        "initial_observation": initial_observation.tolist(),
+        "info": info,
+    }
 
-    # Add "TEST" to the game_sessions dictionary with the cookie as the key
 
-    scenario = smax.map_name_to_scenario(request.scenario)
-    rng, key = random.split(random.PRNGKey(0))
-    env = jaxmarl.make("SMAX", scenario=scenario)
-    obs, state = env.reset(key)
-    game_state = dict(
-        obs=jax_to_json(obs), state=jax_to_json(state), rng=random.PRNGKey(0)
+@app.post("/step/{game_id}")
+async def step(game_id: str, action: Action):
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    env = games[game_id]["env"]
+    observation, reward, terminated, truncated, info = env.step(action.action)
+
+    games[game_id]["observation"] = observation.tolist()
+    games[game_id]["info"] = info
+
+    return GameState(
+        observation=observation.tolist(),
+        reward=float(reward),
+        terminated=terminated,
+        truncated=truncated,
+        info=info,
     )
-    game_session = {"game_state": game_state, "env": env}
-    game_sessions[session_id] = game_session
-    return game_sessions[session_id]["game_state"]
+
+
+@app.get("/game_state/{game_id}")
+async def get_game_state(game_id: str):
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    return GameState(
+        observation=games[game_id]["observation"],
+        reward=0.0,  # We don't store reward in the game state
+        terminated=False,  # We don't store terminated in the game state
+        truncated=False,  # We don't store truncated in the game state
+        info=games[game_id]["info"],
+    )
+
+
+@app.delete("/end_game/{game_id}")
+async def end_game(game_id: str):
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    games[game_id]["env"].close()
+    del games[game_id]
+    return {"message": "Game ended successfully"}

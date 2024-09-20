@@ -17,4 +17,7 @@
         text-align: center;
         overflow: hidden;
     }
+    :global(h1) {
+        margin: 0;
+    }
 </style>
