@@ -4,7 +4,10 @@
 #import "@local/escher:0.0.0": *
 
 #let title = "Monte Carlo Tree Search (MCTS)"
-#show: escher-theme.with(aspect-ratio: "16-9", config-info(author: "Noah Syrkis", date: datetime.today(), title: title))
+#show: escher-theme.with(
+  aspect-ratio: "16-9",
+  config-info(author: "Noah Syrkis", date: datetime.today(), title: title),
+)
 
 
 // body ////////////////////////////////////////////////////////////////////////
