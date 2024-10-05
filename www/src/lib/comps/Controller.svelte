@@ -66,10 +66,6 @@
     }
 
     /* visualizer is the top  half of the controler / screen  (50% height) */
-    .visualizer {
-        height: 50%;
-        background-color: darkgreen;
-    }
     .input {
         /* put input at the bottom of the controler / screen */
         position: absolute;

@@ -2,7 +2,7 @@
     import { onMount } from "svelte";
     import Simulation from "$lib/comps/Simulation.svelte";
     import Controller from "$lib/comps/Controller.svelte";
-    import Visualizer from "$lib/comps/Visualizer.svelte";
+    // import Visualizer from "$lib/comps/Visualizer.svelte";
 
     let message = "Loading...";
     let error: string | null = null;
@@ -41,17 +41,11 @@
         width: 100vw;
     }
 
-    .section {
-        /* add radius to section borders*/
-        /* border: 2px solid white; */
-        /* border-radius: 0.5rem; */
-    }
-
     #sim {
         grid-column: 1;
         /* grid-row: 1 / span 2; */
         height: 100%;
-        width: 100vh;
+        width: 100%;
     }
 
     /* #vis {

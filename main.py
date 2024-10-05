@@ -80,6 +80,8 @@ async def start_game():
         "rngs": tree_util.tree_map(lambda x: x.tolist(), rngs),
         "states": tree_util.tree_map(lambda x: x.tolist(), states),
         "actions": tree_util.tree_map(lambda x: x.tolist(), actions),
+        "place": place,
+        "size": env.terrain.basemap.shape[-1],
     }
 
 
