@@ -36,14 +36,14 @@
         grid-template-columns: 100vh 1fr;
         grid-template-rows: 1fr;
         /* add spacing between the cells*/
-        gap: 1rem;
-        height: calc(100vh - 4px);
+        /* gap: 1rem; */
+        /* height: calc(100vh - 4px); */
         width: 100vw;
     }
 
     .section {
         /* add radius to section borders*/
-        border: 2px solid white;
+        /* border: 2px solid white; */
         /* border-radius: 0.5rem; */
     }
 

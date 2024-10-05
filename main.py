@@ -64,16 +64,17 @@ class GameState(BaseModel):
     info: dict
 
 
+rng = random.PRNGKey(0)
+place = "Vesterbro, Copenhagen, Denmark"
+scenario = pb.env.scenario_fn(place)
+env = pb.Environment(scenario=scenario)
+obs, state = env.reset(rng)
+rngs, states, actions = trajectory_fn(rng, env, state)
+
+
 @app.post("/run")
 async def start_game():
     game_id = str(uuid.uuid4())
-    rng = random.PRNGKey(uuid.getnode())
-    place = "Vesterbro, Copenhagen, Denmark"
-    scenario = pb.env.scenario_fn(place)
-    env = pb.Environment(scenario=scenario)
-    obs, state = env.reset(rng)
-    rngs, states, actions = trajectory_fn(rng, env, state)
-    print(tree_util.tree_map(lambda x: x.shape, states))
     return {
         "game_id": game_id,
         "rngs": tree_util.tree_map(lambda x: x.tolist(), rngs),
