@@ -9,13 +9,11 @@
     let info: any = {};
 
     async function startGame() {
-        const response = await fetch("http://localhost:8000/start_game", {
+        const response = await fetch("http://localhost:8000/start", {
             method: "POST",
         });
         const data = await response.json();
-        gameId = data.game_id;
-        observation = data.initial_observation;
-        info = data.info;
+        console.log(data.actions);
     }
 
     async function step(action: number) {
@@ -67,7 +65,7 @@
 </script>
 
 <div id="simulation">
-    <h1>CartPole-v1 Simulation</h1>
+    <!-- <h1>CartPole-v1 Simulation</h1> -->
     {#if !gameId}
         <button on:click={startGame}>Start Game</button>
     {:else}
@@ -91,10 +89,8 @@
 <style>
     #simulation {
         font-family: Arial, sans-serif;
-        padding: 20px;
     }
     button {
-        margin: 5px;
         padding: 10px 20px;
         font-size: 16px;
     }

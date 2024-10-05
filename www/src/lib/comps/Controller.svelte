@@ -5,11 +5,7 @@
     import { afterUpdate } from "svelte";
 
     let history: { content: string; author: string }[] = [
-        { content: "Welcome to the chat!", author: "bot" },
-        { content: "hello i am user", author: "user" },
-        { content: "How can I help you?", author: "bot" },
-        { content: "hello i am user", author: "user" },
-        { content: "I'm a bot, but I'm here to help!", author: "bot" },
+        { content: "What place on earth do you want to simulate?", author: "bot" },
     ];
 
     let input: HTMLInputElement;
@@ -37,9 +33,6 @@
 </script>
 
 <div id="controller">
-    <div class="visualizer">
-        <Visualizer />
-    </div>
     <div class="history" bind:this={historyContainer}>
         {#each history as message, i (message)}
             {#if message.author === "bot"}
@@ -75,7 +68,7 @@
     /* visualizer is the top  half of the controler / screen  (50% height) */
     .visualizer {
         height: 50%;
-        background-color: green;
+        background-color: darkgreen;
     }
     .input {
         /* put input at the bottom of the controler / screen */
@@ -89,7 +82,7 @@
         height: 2rem;
         font-size: 1rem;
         padding: 0.5rem;
-        background-color: blue;
+        background-color: darkblue;
         border-radius: 0.5rem;
         border: solid 4px rgba(0, 0, 0, 0.1);
     }

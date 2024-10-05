@@ -17,7 +17,7 @@
         text-align: center;
         overflow: hidden;
     }
-    :global(h1) {
+    :global(h1, h2) {
         margin: 0;
     }
 </style>
