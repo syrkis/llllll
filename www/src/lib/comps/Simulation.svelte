@@ -1,4 +1,5 @@
 <script lang="ts">
+    import Map from "$lib/comps/Map.svelte";
     import { onMount, onDestroy } from "svelte";
     import * as d3 from "d3";
     import type { ScaleOrdinal } from "d3-scale";
@@ -236,8 +237,8 @@
 <div id="simulation">
     {#if !gameId}
         <button on:click={startGame}>run</button>
+        {gameId}
     {:else}
-        {t}
         <svg />
     {/if}
 </div>

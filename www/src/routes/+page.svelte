@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
     import Simulation from "$lib/comps/Simulation.svelte";
     import Controller from "$lib/comps/Controller.svelte";
+    import Map from "$lib/comps/Map.svelte";
     // import Visualizer from "$lib/comps/Visualizer.svelte";
 
     let message = "Loading...";
@@ -25,9 +26,10 @@
 </script>
 
 <div class="container">
-    <div id="sim" class="section"><Simulation /></div>
+    <!-- <div id="map"><Map /></div> -->
+    <div id="sim"><Simulation /></div>
     <!-- <div id="vis" class="section"><Visualizer /></div> -->
-    <div id="con" class="section"><Controller /></div>
+    <div id="con"><Controller /></div>
 </div>
 
 <style>
@@ -55,9 +57,5 @@
 
     #con {
         grid-column: 2;
-    }
-
-    .section {
-        overflow: auto;
     }
 </style>
