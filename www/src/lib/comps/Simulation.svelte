@@ -1,89 +1,87 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
+
+    interface State {
+        unit_positions: number[][][];
+        unit_alive: number[][];
+        unit_teams: number[][];
+        unit_health: number[][];
+        unit_types: number[][];
+        unit_weapon_cooldowns: number[][];
+        prev_movement_actions: number[][][];
+        prev_attack_actions: number[][];
+        time: number[];
+        terminal: number[];
+    }
 
     let gameId: string | null = null;
-    let observation: number[] = [];
-    let reward: number = 0;
-    let terminated: boolean = false;
-    let truncated: boolean = false;
-    let info: any = {};
+    let states: State | null = null;
+    let currentStep: number = 0;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
     async function startGame() {
-        const response = await fetch("http://localhost:8000/start", {
+        const response = await fetch("http://localhost:8000/run", {
             method: "POST",
         });
         const data = await response.json();
-        console.log(data.actions);
+        gameId = data.game_id;
+        states = data.states;
+        startAnimation();
     }
 
-    async function step(action: number) {
-        if (!gameId) return;
-
-        const response = await fetch(`http://localhost:8000/step/${gameId}`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ action }),
-        });
-        const data = await response.json();
-        observation = data.observation;
-        reward = data.reward;
-        terminated = data.terminated;
-        truncated = data.truncated;
-        info = data.info;
-
-        if (terminated || truncated) {
-            endGame();
+    function startAnimation() {
+        if (intervalId !== null) {
+            clearInterval(intervalId);
         }
+        intervalId = setInterval(() => {
+            if (states) {
+                if (currentStep < states.time.length - 1) {
+                    currentStep += 1;
+                } else {
+                    currentStep = 0; // Restart the animation
+                }
+            }
+        }, 100);
     }
 
-    async function endGame() {
-        if (!gameId) return;
-
-        await fetch(`http://localhost:8000/end_game/${gameId}`, {
-            method: "DELETE",
-        });
-        gameId = null;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-        if (event.key === "ArrowLeft") {
-            step(0);
-        } else if (event.key === "ArrowRight") {
-            step(1);
+    onDestroy(() => {
+        if (intervalId !== null) {
+            clearInterval(intervalId);
         }
-    }
-
-    onMount(() => {
-        window.addEventListener("keydown", handleKeyDown);
-        return () => {
-            window.removeEventListener("keydown", handleKeyDown);
-            if (gameId) endGame();
-        };
     });
+
+    function getTimeStepData(state: State, timeStep: number) {
+        if (timeStep < 0 || timeStep >= state.time.length) {
+            throw new Error("Invalid time step");
+        }
+
+        return {
+            unit_positions: state.unit_positions[timeStep],
+            unit_alive: state.unit_alive[timeStep],
+            unit_teams: state.unit_teams[timeStep],
+            unit_health: state.unit_health[timeStep],
+            unit_types: state.unit_types[timeStep],
+            unit_weapon_cooldowns: state.unit_weapon_cooldowns[timeStep],
+            prev_movement_actions: state.prev_movement_actions[timeStep],
+            prev_attack_actions: state.prev_attack_actions[timeStep],
+            time: state.time[timeStep],
+            terminal: state.terminal[timeStep],
+        };
+    }
 </script>
 
 <div id="simulation">
-    <!-- <h1>CartPole-v1 Simulation</h1> -->
     {#if !gameId}
-        <button on:click={startGame}>Start Game</button>
+        <button on:click={startGame}>run</button>
     {:else}
-        <div>
-            <h2>Game State</h2>
-            <p>Observation: {JSON.stringify(observation)}</p>
-            <p>Reward: {reward}</p>
-            <p>Terminated: {terminated}</p>
-            <p>Truncated: {truncated}</p>
-            <p>Info: {JSON.stringify(info)}</p>
-        </div>
-        <div>
-            <button on:click={() => step(0)}>Move Left</button>
-            <button on:click={() => step(1)}>Move Right</button>
-        </div>
-        <button on:click={endGame}>End Game</button>
+        <svg width="500" height="500">
+            {#if states}
+                {#each getTimeStepData(states, currentStep).unit_positions as position, index}
+                    <circle cx={position[0]} cy={position[1]} r="5" fill="blue" />
+                {/each}
+            {/if}
+        </svg>
     {/if}
-    <p>Use left and right arrow keys to control the cart</p>
 </div>
 
 <style>
@@ -93,5 +91,8 @@
     button {
         padding: 10px 20px;
         font-size: 16px;
+    }
+    svg {
+        border: 1px solid black;
     }
 </style>

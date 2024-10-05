@@ -64,7 +64,7 @@ class GameState(BaseModel):
     info: dict
 
 
-@app.post("/start")
+@app.post("/run")
 async def start_game():
     game_id = str(uuid.uuid4())
     rng = random.PRNGKey(uuid.getnode())
@@ -73,6 +73,7 @@ async def start_game():
     env = pb.Environment(scenario=scenario)
     obs, state = env.reset(rng)
     rngs, states, actions = trajectory_fn(rng, env, state)
+    print(tree_util.tree_map(lambda x: x.shape, states))
     return {
         "game_id": game_id,
         "rngs": tree_util.tree_map(lambda x: x.tolist(), rngs),
