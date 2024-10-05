@@ -21,16 +21,23 @@
     let states: State | null = null;
     let place: string | null = null;
     let currentStep: number = 0;
-    let width: number = 0; // map width
+    // let width: number = 0;
     let intervalId: ReturnType<typeof setInterval> | null = null;
     let vh: number = 0;
     let scale: d3.ScaleLinear<number, number> | null = null;
+    let bodyColor: string = "#888"; // default color in case fetching fails
 
-    // Define a color scale or mapping for the two teams (gray scale and green)
+    // Fetch the body's computed color to use for the gray team
+    function updateBodyColor() {
+        const bodyStyles = window.getComputedStyle(document.body);
+        bodyColor = bodyStyles.color || "#888";
+    }
+
     const teamColors: ScaleOrdinal<number, string> = d3
         .scaleOrdinal<number, string>()
         .domain([0, 1])
-        .range(["#888", "#4b5320"]);
+        .range([bodyColor, "#4b5320"]);
+
     async function startGame() {
         const response = await fetch("http://localhost:8000/run", {
             method: "POST",
@@ -39,7 +46,6 @@
         gameId = data.game_id;
         states = data.states;
         place = data.place;
-        width = data.width;
         startAnimation();
     }
 
@@ -52,7 +58,7 @@
                 if (currentStep < states.time.length - 1) {
                     currentStep += 1;
                 } else {
-                    currentStep = 0; // Restart the animation
+                    currentStep = 0;
                 }
                 updateVisualization();
             }
@@ -66,6 +72,7 @@
         const data = states.unit_positions[currentStep];
         const teams = states.unit_teams[currentStep];
         const types = states.unit_types[currentStep];
+        const health = states.unit_health[currentStep];
         const attacks = states.prev_attack_actions[currentStep];
 
         // Bind data to existing shapes
@@ -80,11 +87,11 @@
             const y = scale!(d[1]);
 
             if (type === 0) {
-                shape.transition().duration(600).ease(d3.easeLinear).attr("cx", x).attr("cy", y).attr("fill", color);
+                shape.transition().duration(300).ease(d3.easeLinear).attr("cx", x).attr("cy", y).attr("fill", color);
             } else if (type === 1) {
                 shape
                     .transition()
-                    .duration(1000)
+                    .duration(300)
                     .ease(d3.easeLinear)
                     .attr("x", x - 5)
                     .attr("y", y - 5)
@@ -92,7 +99,7 @@
             } else if (type === 2) {
                 shape
                     .transition()
-                    .duration(1000)
+                    .duration(300)
                     .ease(d3.easeLinear)
                     .attr("points", `${x},${y - 5} ${x - 5},${y + 5} ${x + 5},${y + 5}`)
                     .attr("fill", color);
@@ -143,36 +150,67 @@
         });
         shapes.exit().remove();
 
-        // Update streaks
-        svg.selectAll(".streak").remove(); // Clear existing streaks
+        // Health bars
+        const healthBars = svg.selectAll(".health-bar").data(data, (d, i) => i);
 
-        // Add new streaks
+        healthBars
+            .enter()
+            .append("rect")
+            .attr("class", "health-bar")
+            .attr("x", (d, i) => scale!(d[0]) - 5)
+            .attr("y", (d, i) => scale!(d[1]) - 15)
+            .attr("width", 10)
+            .attr("height", 2)
+            .attr("fill", "red");
+
+        healthBars
+            .transition()
+            .duration(300)
+            .ease(d3.easeLinear)
+            .attr("x", (d, i) => scale!(d[0]) - 5)
+            .attr("y", (d, i) => scale!(d[1]) - 15)
+            .attr("width", (d, i) => (health[i] / 100) * 10);
+
+        healthBars.exit().remove();
+
+        svg.selectAll(".streak").remove();
+
         data.forEach((agent, i) => {
             const attack = attacks[i];
             if (attack >= 5) {
                 const targetIndex = attack - 5;
                 if (targetIndex >= 0 && targetIndex < data.length) {
                     const targetData = data[targetIndex];
+
                     const x1 = scale!(agent[0]);
                     const y1 = scale!(agent[1]);
                     const x2 = scale!(targetData[0]);
                     const y2 = scale!(targetData[1]);
-                    const color = teamColors(teams[i]); // Shooter's color
+
+                    const offsetRatio = 0.05;
+                    const dx = x2 - x1;
+                    const dy = y2 - y1;
+                    const length = Math.sqrt(dx * dx + dy * dy);
+
+                    const offsetX = (dx / length) * offsetRatio * length;
+                    const offsetY = (dy / length) * offsetRatio * length;
+
+                    const strokeColor = teamColors(teams[i]);
 
                     svg.append("line")
                         .attr("class", "streak")
-                        .attr("x1", x1)
-                        .attr("y1", y1)
-                        .attr("x2", x1) // Start at the shooter's position
-                        .attr("y2", y1)
-                        .attr("stroke", color)
-                        .attr("stroke-width", 2)
+                        .attr("x1", x1 + offsetX)
+                        .attr("y1", y1 + offsetY)
+                        .attr("x2", x1 + offsetX)
+                        .attr("y2", y1 + offsetY)
+                        .attr("stroke", strokeColor)
+                        .attr("stroke-width", 3)
                         .attr("stroke-opacity", 0.6)
                         .transition()
                         .duration(1000)
                         .ease(d3.easeLinear)
-                        .attr("x2", x2)
-                        .attr("y2", y2)
+                        .attr("x2", x2 - offsetX)
+                        .attr("y2", y2 - offsetY)
                         .attr("stroke-opacity", 0)
                         .remove();
                 }
@@ -187,6 +225,7 @@
     });
 
     onMount(() => {
+        updateBodyColor(); // Fetch the body's color once on mount
         vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0) * 0.96;
         scale = d3.scaleLinear().domain([0, 400]).range([0, vh]);
         updateVisualization();
@@ -198,6 +237,7 @@
     {#if !gameId}
         <button on:click={startGame}>run</button>
     {:else}
+        {t}
         <svg />
     {/if}
 </div>
@@ -213,7 +253,7 @@
         font-size: 16px;
     }
     svg {
-        border: 2px solid #888;
+        border: 2px solid;
         height: 100%;
         width: 100%;
     }
