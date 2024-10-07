@@ -42,7 +42,7 @@
     const teamColors: ScaleOrdinal<number, string> = d3
         .scaleOrdinal<number, string>()
         .domain([0, 1])
-        .range([bodyColor, "#4b5320"]);
+        .range([bodyColor, "#fff"]);
 
     async function startGame() {
         const response = await fetch("http://localhost:8000/run", {
@@ -63,8 +63,8 @@
         if (!solid || !water || !scale) return;
 
         const cellSize = scale(1) - scale(0);
-        const solidTileSize = cellSize * 0.4;
-        const waterCircleRadius = cellSize * 0.05;
+        const solidTileSize = cellSize * 0.5;
+        const waterCircleRadius = cellSize * 0.2;
         const treeSize = cellSize * 0.1;
         const offset = (cellSize - solidTileSize) / 2; // Centering offset
 
@@ -122,8 +122,8 @@
             .attr("cx", (d) => scale(d.x) + cellSize / 2)
             .attr("cy", (d) => scale(d.y) + cellSize / 2)
             .attr("r", waterCircleRadius)
-            // nice blue for water
-            .attr("fill", "#0077be")
+            // nice blue for watea
+            .attr("fill", "#fff")
             .attr("stroke", "none");
 
         // trees are represented by a circle
@@ -143,7 +143,7 @@
             .attr("cx", (d) => scale(d.x) + cellSize / 2)
             .attr("cy", (d) => scale(d.y) + cellSize / 2)
             .attr("r", treeSize)
-            .attr("fill", "#4b5320") // A green color for trees
+            .attr("fill", "#fff") // A green color for trees
             .attr("stroke", "none");
     }
 
@@ -277,9 +277,12 @@
 
         data.forEach((agent, i) => {
             const attack = attacks[i];
-            if (attack >= 5) {
-                const targetIndex = attack - 5;
-                if (targetIndex >= 0 && targetIndex < data.length) {
+            const agentTeam = teams[i];
+            if (attack === 5) {
+                // Find the first unit of the opposite team
+                const targetIndex = data.findIndex((_, idx) => teams[idx] !== agentTeam);
+
+                if (targetIndex !== -1) {
                     const targetData = data[targetIndex];
 
                     const x1 = scale!(agent[0]);
@@ -328,7 +331,7 @@
     onMount(() => {
         updateBodyColor(); // Fetch the body's color once on mount
         vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0) * 0.96;
-        scale = d3.scaleLinear().domain([0, 150]).range([0, vh]);
+        scale = d3.scaleLinear().domain([0, 100]).range([0, vh]);
         updateVisualization();
         startGame();
     });

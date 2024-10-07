@@ -77,7 +77,7 @@
         line-height: 3.5rem;
         text-align: justify;
         font-size: 2rem;
-        font-family: "Latin Modern Roman";
+        font-family: "IBM Plex Sans", sans-serif;
     }
     .user {
         padding: 0.5rem;

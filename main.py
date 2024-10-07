@@ -65,8 +65,8 @@ class GameState(BaseModel):
 
 
 rng = random.PRNGKey(0)
-place = "Kongens Have, Copenhagen, Denmark"
-scenario = pb.env.scenario_fn(place, 150)
+place = "Marmorkirken, Copenhagen, Denmark"
+scenario = pb.env.scenario_fn(place, 100)
 env = pb.Environment(scenario=scenario)
 obs, state = env.reset(rng)
 rngs, states, actions = trajectory_fn(rng, env, state)
@@ -82,9 +82,9 @@ async def start_game():
         "actions": tree_util.tree_map(lambda x: x.tolist(), actions),
         "place": place,
         # "terrain": tree_util.tree_map(lambda x: x.tolist(), env.terrain),
-        "water": env.terrain.water.tolist(),
-        "solid": env.terrain.building.tolist(),
-        "forst": env.terrain.forest.tolist(),
+        "water": env.terrain.water.T.tolist(),
+        "solid": env.terrain.building.T.tolist(),
+        "forst": env.terrain.forest.T.tolist(),
     }
 
 
