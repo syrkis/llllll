@@ -3751,13 +3751,12 @@ files = [
 
 [[package]]
 name = "parabellum"
-version = "0.3.1"
+version = "0.3.3"
 description = "Parabellum environment for parallel warfare simulation"
 optional = false
 python-versions = "<3.12,>=3.11"
 files = [
-    {file = "parabellum-0.3.1-py3-none-any.whl", hash = "sha256:d7d3456543ead686bd9012690b35db3b168dd309de18e22204785a6c322c2c0d"},
-    {file = "parabellum-0.3.1.tar.gz", hash = "sha256:9971ed2fab7ee277bc8fda0342f6d9fa04fe7b4108bf58d6047121a096ac3b29"},
+    {file = "parabellum-0.3.3-py3-none-any.whl", hash = "sha256:dc1fc06fabed37e72228e9e0d9ecacab369fbfb378a13bf80e79c677a0f87075"},
 ]
 
 [package.dependencies]

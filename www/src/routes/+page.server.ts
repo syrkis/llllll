@@ -5,7 +5,7 @@ const client = new OpenAI();
 async function main() {
   const stream = await client.chat.completions.create({
     model: "gpt-4",
-    messages: [{ role: "user", content: "Say this is a test 100 times" }],
+    messages: [{ role: "user", content: "Say this is a test" }],
     stream: true,
   });
   for await (const chunk of stream) {

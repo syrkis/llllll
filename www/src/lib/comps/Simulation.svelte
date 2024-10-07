@@ -228,7 +228,7 @@
     onMount(() => {
         updateBodyColor(); // Fetch the body's color once on mount
         vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0) * 0.96;
-        scale = d3.scaleLinear().domain([0, 400]).range([0, vh]);
+        scale = d3.scaleLinear().domain([0, 100]).range([0, vh]);
         updateVisualization();
         startGame();
     });

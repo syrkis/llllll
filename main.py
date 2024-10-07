@@ -66,7 +66,7 @@ class GameState(BaseModel):
 
 rng = random.PRNGKey(0)
 place = "Vesterbro, Copenhagen, Denmark"
-scenario = pb.env.scenario_fn(place)
+scenario = pb.env.scenario_fn(place, 100)
 env = pb.Environment(scenario=scenario)
 obs, state = env.reset(rng)
 rngs, states, actions = trajectory_fn(rng, env, state)

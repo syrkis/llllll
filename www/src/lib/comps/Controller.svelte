@@ -43,12 +43,18 @@
         {/each}
     </div>
 
-    <div class="input">
+    <!-- <div class="input">
         <input bind:this={input} type="text" placeholder="Type a message..." on:keydown={handleKeydown} />
-    </div>
+    </div> -->
 </div>
 
 <style>
+    #controller {
+        /*controler is 96vh high with 2 as padding above and bellow. Border is 2px solid*/
+        height: 96vh;
+        border: 2px solid;
+        margin: 2vh 2vh 2vh 0;
+    }
     .bot {
         padding: 0.5rem;
         text-align: left;
@@ -78,7 +84,8 @@
         height: 2rem;
         font-size: 1rem;
         padding: 0.5rem;
-        background-color: darkblue;
+        background-color: black;
+        color: white;
         border-radius: 0.5rem;
         border: solid 4px rgba(0, 0, 0, 0.1);
     }
