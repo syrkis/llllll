@@ -22,16 +22,21 @@
     let states: State | null = null;
     let place: string | null = null;
     let currentStep: number = 0;
+    // solid is a mask of the same size as the map, where each cell is true if the cell is solid
+    let solid: boolean[][] = [];
+    let water: boolean[][] = [];
+    let trees: boolean[][] = [];
     // let width: number = 0;
     let intervalId: ReturnType<typeof setInterval> | null = null;
     let vh: number = 0;
     let scale: d3.ScaleLinear<number, number> | null = null;
-    let bodyColor: string = "#888"; // default color in case fetching fails
+    let bodyColor: string = "#fff"; // default color in case fetching fails
+    // body color should be black if the system is in light mode, and white if in dark mode
 
     // Fetch the body's computed color to use for the gray team
     function updateBodyColor() {
         const bodyStyles = window.getComputedStyle(document.body);
-        bodyColor = bodyStyles.color || "#888";
+        bodyColor = bodyStyles.color || "#fff";
     }
 
     const teamColors: ScaleOrdinal<number, string> = d3
@@ -47,7 +52,99 @@
         gameId = data.game_id;
         states = data.states;
         place = data.place;
+        solid = data.solid;
+        water = data.water;
+        trees = data.forst;
         startAnimation();
+        updateVisualization(); // Add this line to immediately draw the background
+    }
+
+    function createBackgroundGrid(svg: d3.Selection<SVGSVGElement, unknown, null, undefined>) {
+        if (!solid || !water || !scale) return;
+
+        const cellSize = scale(1) - scale(0);
+        const solidTileSize = cellSize * 0.4;
+        const waterCircleRadius = cellSize * 0.05;
+        const treeSize = cellSize * 0.1;
+        const offset = (cellSize - solidTileSize) / 2; // Centering offset
+
+        svg.selectAll(".background-cell")
+            .data(
+                solid.flat().map((isSolid, index) => ({
+                    isSolid,
+                    x: index % solid[0].length,
+                    y: Math.floor(index / solid[0].length),
+                })),
+            )
+            .join("rect")
+            .attr("class", "background-cell")
+            .attr("x", (d) => scale(d.x))
+            .attr("y", (d) => scale(d.y))
+            .attr("width", cellSize)
+            .attr("height", cellSize)
+            .attr("fill", "transparent");
+        // .attr("stroke", "#222")
+        // .attr("stroke-width", 0.5);
+
+        svg.selectAll(".solid-tile")
+            .data(
+                solid
+                    .flat()
+                    .map((isSolid, index) => ({
+                        isSolid,
+                        x: index % solid[0].length,
+                        y: Math.floor(index / solid[0].length),
+                    }))
+                    .filter((d) => d.isSolid),
+            )
+            .join("rect")
+            .attr("class", "solid-tile")
+            .attr("x", (d) => scale(d.x) + offset)
+            .attr("y", (d) => scale(d.y) + offset)
+            .attr("width", solidTileSize)
+            .attr("height", solidTileSize)
+            .attr("fill", "#fff")
+            .attr("stroke", "none");
+
+        svg.selectAll(".water-cell")
+            .data(
+                water
+                    .flat()
+                    .map((isWater, index) => ({
+                        isWater,
+                        x: index % water[0].length,
+                        y: Math.floor(index / water[0].length),
+                    }))
+                    .filter((d) => d.isWater),
+            )
+            .join("circle")
+            .attr("class", "water-cell")
+            .attr("cx", (d) => scale(d.x) + cellSize / 2)
+            .attr("cy", (d) => scale(d.y) + cellSize / 2)
+            .attr("r", waterCircleRadius)
+            // nice blue for water
+            .attr("fill", "#0077be")
+            .attr("stroke", "none");
+
+        // trees are represented by a circle
+        svg.selectAll(".tree-cell")
+            .data(
+                trees
+                    .flat()
+                    .map((isTree, index) => ({
+                        isTree,
+                        x: index % trees[0].length,
+                        y: Math.floor(index / trees[0].length),
+                    }))
+                    .filter((d) => d.isTree),
+            )
+            .join("circle")
+            .attr("class", "tree-cell")
+            .attr("cx", (d) => scale(d.x) + cellSize / 2)
+            .attr("cy", (d) => scale(d.y) + cellSize / 2)
+            .attr("r", treeSize)
+            .attr("fill", "#4b5320") // A green color for trees
+            .attr("stroke", "none");
     }
 
     function startAnimation() {
@@ -70,6 +167,8 @@
         if (!states || !scale) return;
 
         const svg = d3.select("svg");
+        createBackgroundGrid(svg);
+
         const data = states.unit_positions[currentStep];
         const teams = states.unit_teams[currentStep];
         const types = states.unit_types[currentStep];
@@ -162,7 +261,7 @@
             .attr("y", (d, i) => scale!(d[1]) - 15)
             .attr("width", 10)
             .attr("height", 2)
-            .attr("fill", "red");
+            .attr("fill", "#fff");
 
         healthBars
             .transition()
@@ -225,10 +324,11 @@
         }
     });
 
+    // max domain is the length of the solid square
     onMount(() => {
         updateBodyColor(); // Fetch the body's color once on mount
         vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0) * 0.96;
-        scale = d3.scaleLinear().domain([0, 100]).range([0, vh]);
+        scale = d3.scaleLinear().domain([0, 150]).range([0, vh]);
         updateVisualization();
         startGame();
     });
@@ -254,7 +354,7 @@
         font-size: 16px;
     }
     svg {
-        border: 2px solid;
+        /* border: 2px solid; */
         height: 100%;
         width: 100%;
     }

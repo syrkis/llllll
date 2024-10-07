@@ -5,7 +5,22 @@
     import { afterUpdate } from "svelte";
 
     let history: { content: string; author: string }[] = [
-        { content: "What place on earth do you want to simulate?", author: "bot" },
+        {
+            content: `Welcome to the life like command and control (C2) simulator. You are in a C2 center, far removed from the war.`,
+            author: "bot",
+        },
+        {
+            content: `In this scenario, the war is global, and yet fought with guns. To do your part, you must act as a C2 commander of the allies.`,
+            author: "bot",
+        },
+        {
+            content: `You are fighting the enemies. Your troops can hide and move through trees, shoot but not cross water, while buildings are impenetrable.`,
+            author: "bot",
+        },
+        {
+            content: `Tell me what place on earth you would like to command. Kongens Have, Copenhagen, Denmark, could use your help.`,
+            author: "bot",
+        },
     ];
 
     let input: HTMLInputElement;
@@ -52,13 +67,17 @@
     #controller {
         /*controler is 96vh high with 2 as padding above and bellow. Border is 2px solid*/
         height: 96vh;
-        border: 2px solid;
+        /* border: 2px solid; */
         margin: 2vh 2vh 2vh 0;
     }
     .bot {
         padding: 0.5rem;
         text-align: left;
-        font-family: monospace;
+        letter-spacing: 0.08rem;
+        line-height: 3.5rem;
+        text-align: justify;
+        font-size: 2rem;
+        font-family: "Latin Modern Roman";
     }
     .user {
         padding: 0.5rem;
