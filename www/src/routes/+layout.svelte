@@ -2,6 +2,17 @@
 
 <style>
     /* invert if system as darkmode */
+
+    :global(.ink) {
+        fill: black;
+        stroke: black;
+    }
+    @media (prefers-color-scheme: dark) {
+        :global(.ink) {
+            fill: white;
+            stroke: white;
+        }
+    }
     @media (prefers-color-scheme: dark) {
         :global(body) {
             /* filter: invert(1); */
