@@ -2,11 +2,15 @@
 
 <style>
     :global(.ink) {
-        fill: none;
+        fill: black;
         stroke: black;
     }
     :global(.ink.enemy) {
         fill: black;
+        stroke: black;
+    }
+    :global(.ink.ally) {
+        fill: white;
         stroke: black;
     }
     :global(body) {
@@ -16,11 +20,15 @@
 
     @media (prefers-color-scheme: dark) {
         :global(.ink) {
-            /* fill: white; */
+            fill: white;
             stroke: white;
         }
         :global(.ink.enemy) {
             fill: white;
+            stroke: white;
+        }
+        :global(.ink.ally) {
+            fill: black;
             stroke: white;
         }
         :global(body) {
