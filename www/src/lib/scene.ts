@@ -12,7 +12,7 @@ export function createBackgroundGrid(
 
   const cellSize = scale(1) - scale(0);
   const solidTileSize = cellSize * 0.5;
-  const waterCircleRadius = cellSize * 0.2;
+  const waterCircleRadius = cellSize * 0.05;
   const treeSize = cellSize * 0.1;
   const offset = (cellSize - solidTileSize) / 2; // Centering offset
 

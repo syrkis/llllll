@@ -32,7 +32,7 @@
         gridData = {
             solid: data.solid,
             water: data.water,
-            trees: data.forst,
+            trees: data.trees,
         };
         startAnimation();
         updateVisualization(); // Add this line to immediately draw the background

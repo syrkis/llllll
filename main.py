@@ -65,7 +65,7 @@ class GameState(BaseModel):
 
 
 rng = random.PRNGKey(0)
-place = "Marmorkirken, Copenhagen, Denmark"
+place = "Planetarium, Copenhagen, Denmark"
 scenario = pb.env.scenario_fn(place, 100)
 env = pb.Environment(scenario=scenario)
 obs, state = env.reset(rng)
@@ -84,7 +84,8 @@ async def start_game():
         # "terrain": tree_util.tree_map(lambda x: x.tolist(), env.terrain),
         "water": env.terrain.water.T.tolist(),
         "solid": env.terrain.building.T.tolist(),
-        "forst": env.terrain.forest.T.tolist(),
+        "trees": env.terrain.forest.T.tolist(),
+        "agents": env.agents,
     }
 
 
