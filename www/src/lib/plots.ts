@@ -7,9 +7,15 @@ import { get } from "svelte/store";
 export function updateVisualization() {
   const { currentState, gameInfo } = get(gameStore);
   const currentScale = get(scale);
-  if (!currentState || !gameInfo || !currentScale) return;
+  console.log("updateVisualization called with:", { currentState, gameInfo, currentScale });
+
+  if (!currentState || !gameInfo || !currentScale) {
+    console.log("Missing data for visualization, returning early");
+    return;
+  }
 
   console.log("Current GameInfo in updateVisualization:", gameInfo);
+  console.log("Current State in updateVisualization:", currentState);
 
   const svg = d3.select<SVGSVGElement, unknown>("svg");
   createBackgroundGrid(svg, gameInfo.terrain, currentScale);
@@ -23,6 +29,8 @@ export function updateVisualization() {
     attack: currentState.prev_attack_actions[i],
   }));
 
+  console.log("Unit data for visualization:", unitData);
+
   updateShapes(svg, unitData, gameInfo.unit_type_info, currentScale);
   updateHealthBars(svg, unitData, currentScale);
   updateAttackStreaks(svg, unitData, currentScale);
@@ -34,6 +42,7 @@ function updateShapes(
   unitTypeInfo: Scenario["unit_type_info"],
   currentScale: d3.ScaleLinear<number, number>,
 ) {
+  console.log("Updating shapes with unit data:", unitData);
   const shapes = svg.selectAll<SVGPathElement, UnitData>(".shape").data(unitData, (d, i) => i.toString());
 
   shapes
@@ -41,10 +50,17 @@ function updateShapes(
     .append("path")
     .attr("class", (d) => `shape ink type-${d.type} ${d.team === 0 ? "ally" : "enemy"}`)
     .merge(shapes)
-    .attr("d", (d) => {
+    .attr("d", (d, i, nodes) => {
       const { x, y } = getPosition(d, currentScale);
       const radius = currentScale(unitTypeInfo.unit_type_radiuses[d.type]);
-      return createUnitShape(d, x, y, radius);
+      const oldD = d3.select(nodes[i]).attr("d");
+      const newD = createUnitShape(d, x, y, radius);
+      if (oldD !== newD) {
+        console.log(`Shape ${i} updated: type=${d.type}, position=(${x}, ${y}), radius=${radius}`);
+      } else {
+        console.log(`Shape ${i} not changed: type=${d.type}, position=(${x}, ${y}), radius=${radius}`);
+      }
+      return newD;
     });
 
   shapes.exit().remove();

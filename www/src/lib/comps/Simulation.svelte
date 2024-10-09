@@ -1,7 +1,8 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
     import { gameStore, scale } from "$lib/store";
-    import { createGame, resetGame, stepGame } from "$lib/api";
+    import { get } from "svelte/store";
+    import { createGame, resetGame, startGame } from "$lib/api";
     import { createBackgroundGrid } from "$lib/scene";
     import { updateVisualization } from "$lib/plots";
     import * as d3 from "d3";
@@ -11,7 +12,24 @@
 
     let isMounted = false;
     let svgElement: SVGSVGElement;
+    let socket: WebSocket;
 
+    function setupWebSocket(gameId: string) {
+        socket = new WebSocket(`ws://localhost:8000/ws/${gameId}`);
+        socket.onopen = () => {
+            console.log("WebSocket connection established");
+        };
+        socket.onmessage = (event) => {
+            console.log("Received WebSocket message:", event.data);
+            const state: State = JSON.parse(event.data);
+            console.log("Parsed state:", state);
+            console.log("New unit positions:", state.unit_positions);
+            gameStore.setState(state);
+            console.log("Updated game store state:", get(gameStore).currentState);
+            updateVisualization();
+        };
+        // ... (keep other WebSocket handlers)
+    }
     function initializeScale() {
         if (isMounted && svgElement) {
             const width = svgElement.clientWidth;
@@ -33,11 +51,13 @@
 
             initializeScale();
 
-            // Automatically reset the game
             const { obs, state }: { obs: Observation; state: State } = await resetGame(gameId);
             gameStore.setState(state);
             console.log("Initial game state:", state);
             console.log("Initial observation:", obs);
+
+            // Set up WebSocket connection
+            setupWebSocket(gameId);
 
             // Render the initial state
             updateVisualization();
@@ -58,9 +78,13 @@
         if (typeof window !== "undefined") {
             window.removeEventListener("resize", initializeScale);
         }
+        if (socket) {
+            socket.close();
+        }
     });
 
     $: if ($gameStore.gameInfo && $scale) {
+        console.log("Game store or scale updated, calling updateVisualization");
         updateVisualization();
     }
 </script>

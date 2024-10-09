@@ -15,6 +15,8 @@ const initialGameStore: GameStore = {
   gameInfo: null,
 };
 
+export const viewportHeight = writable<number>(0);
+
 function createGameStore() {
   const { subscribe, set, update } = writable<GameStore>(initialGameStore);
 

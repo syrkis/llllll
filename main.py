@@ -6,7 +6,6 @@
 import uuid
 import asyncio
 
-# WebSocketDisconnect
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -19,7 +18,13 @@ from functools import partial
 
 # %% FastAPI server
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 games = {}
 
 
@@ -27,7 +32,7 @@ games = {}
 def step(carry, xs, env):
     (obs, state), (time_step, rng) = carry, xs  # first element is the time step
     step_key, *act_keys = random.split(rng, 1 + len(env.agents))
-    actions = {a: env.action_space(a).sample(act_keys[i]) for i, a in enumerate(env.agents)}
+    actions = {a: 2 for a in env.agents}
     new_obs, new_state, reward, done, infos = env.step(step_key, state, actions)
     return (new_obs, new_state), (step_key, state, actions)
 
@@ -72,11 +77,17 @@ class State(BaseModel):
 class GameState(BaseModel):  # for the client
     actions: Dict[str, int]
     state: State
-    # observation: list
-    # reward: float
-    # terminated: bool
-    # truncated: bool
-    # info: dict
+
+
+class Game:
+    def __init__(self, id, env):
+        self.id = id
+        self.env = env
+        self.state = None
+        self.running = False
+        self.terminal = False
+        self.state_updated = asyncio.Event()
+        self.rng = random.PRNGKey(0)
 
 
 # %% Routes
@@ -85,67 +96,80 @@ async def game_create(place):
     game_id = str(uuid.uuid4())
     if game_id in games:  # we already have a game with this id
         return game_id
-    rng = random.PRNGKey(0)
     scenario = pb.env.scenario_fn(place, 100)
     env = pb.Environment(scenario=scenario)
-    obs, state = env.reset(rng)
-    games[game_id] = {"env": env, "rng": rng, "current_state": state, "running": False, "terminal": False}
+    game = Game(game_id, env)
+    game.state = game.env.reset(game.rng)[1]  # Get initial state
+    games[game_id] = game
     print(f"Game {game_id} created")
     return game_id, game_info_fn(env)
 
 
 @app.post("/games/{game_id}/start")
 async def start_game(game_id: str):
-    print("starting game")
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
-    games[game_id]["running"] = True
-    asyncio.create_task(game_loop(game_id))
+    game = games[game_id]
+    if not game.running:
+        game.running = True
+        asyncio.create_task(game_loop(game))
     return {"message": "Game started"}
 
 
-async def game_loop(game_id: str):
-    while games[game_id]["running"] and not games[game_id]["terminal"]:
-        print("stepping game")
-        state = step_game(game_id)
-        games[game_id]["current_state"] = state
-        await asyncio.sleep(1)  # type: ignore[awaitable-is-generator]
+async def game_loop(game: Game):
+    while game.running and not game.terminal:
+        new_state = step_game(game)
+        game.state = new_state
+        game.state_updated.set()  # notify
+        await asyncio.sleep(1)
 
 
-def step_game(game_id: str) -> pb.State:  # Assuming pb.State is the correct return type
-    env = games[game_id]["env"]
-    state = games[game_id]["current_state"]
-    rng, step_key = random.split(games[game_id]["rng"])
-    games[game_id]["rng"] = rng
+def step_game(game: Game) -> pb.State:
+    game.rng, step_key = random.split(game.rng)
+    actions = {a: 2 for a in game.env.agents}
+    obs, new_state, reward, done, infos = game.env.step(step_key, game.state, actions)
 
-    actions = {a: env.action_space(a).sample(random.split(step_key, 1)[0]) for a in env.agents}
-    obs, new_state, reward, done, infos = env.step(step_key, state, actions)
-
-    games[game_id]["terminal"] = done
+    game.terminal = new_state.terminal.all().item()
+    print(f"Step completed for game {game.id}: terminal={game.terminal}, time={new_state.time}")
 
     return new_state
 
 
+@app.get("/games/{game_id}/status")
+async def game_status(game_id: str):
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+    game = games[game_id]
+    return {
+        "running": game.running,
+        "terminal": game.terminal,
+        "time": game.state.time if game.state else None,
+    }
+
+
 @app.websocket("/ws/{game_id}")
 async def websocket_endpoint(websocket: WebSocket, game_id: str):
-    await websocket.accept()  # type: ignore[awaitable-is-generator]
+    await websocket.accept()
+    if game_id not in games:
+        await websocket.close(code=4000, reason="Game not found")
+        return
+    game = games[game_id]
     try:
         while True:
-            if game_id in games and "current_state" in games[game_id]:
-                state = games[game_id]["current_state"]
-                state_dict = {
-                    "unit_positions": state.unit_positions.tolist(),
-                    "unit_alive": state.unit_alive.tolist(),
-                    "unit_teams": state.unit_teams.tolist(),
-                    "unit_health": state.unit_health.tolist(),
-                    "unit_types": state.unit_types.tolist(),
-                    "unit_weapon_cooldowns": state.unit_weapon_cooldowns.tolist(),
-                    "prev_attack_actions": state.prev_attack_actions.tolist(),
-                    "time": state.time,
-                    "terminal": state.terminal,
-                }
-                await websocket.send_json(state_dict)  # type: ignore
-            await asyncio.sleep(0.1)  # type: ignore
+            await game.state_updated.wait()  # Wait for the state to be updated
+            game.state_updated.clear()  # Reset the event
+            state_dict = {
+                "unit_positions": game.state.unit_positions.tolist(),
+                "unit_alive": game.state.unit_alive.tolist(),
+                "unit_teams": game.state.unit_teams.tolist(),
+                "unit_health": game.state.unit_health.tolist(),
+                "unit_types": game.state.unit_types.tolist(),
+                "unit_weapon_cooldowns": game.state.unit_weapon_cooldowns.tolist(),
+                "prev_attack_actions": game.state.prev_attack_actions.tolist(),
+                "time": game.state.time,
+                "terminal": game.state.terminal.tolist(),
+            }
+            await websocket.send_json(state_dict)
     except WebSocketDisconnect:
         print(f"WebSocket for game {game_id} disconnected")
 
@@ -154,13 +178,12 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str):
 async def game_reset(game_id: str):
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
-    env = games[game_id]["env"]
-    rng, key = random.split(random.PRNGKey(0))
-    obs, state = env.reset(key)
-    games[game_id]["rng"] = rng
-    games[game_id]["current_state"] = state
-    games[game_id]["running"] = False
-    games[game_id]["terminal"] = False
+    game = games[game_id]
+    game.rng, key = random.split(random.PRNGKey(0))
+    obs, state = game.env.reset(key)
+    game.state = state
+    game.running = False
+    game.terminal = False
 
     obs = tree_util.tree_map(lambda x: x.tolist(), obs)
     state_dict = {
@@ -177,32 +200,29 @@ async def game_reset(game_id: str):
     return {"obs": obs, "state": state_dict}
 
 
-# @app.post("/games/{game_id}/step")
-# async def game_step(game_id: str, action: Action):
-#     env = games[game_id]["env"]
-#     obs, state = games[game_id]["obss"][-1], games[game_id]["states"][-1]
-#     rng, key = random.split(games[game_id]["game_state_rng"][-1])
-#     action_keys = random.split(key, len(env.agents))
-#     actions = {a: env.action_space(a).sample(random.split(action_keys[i], 1)[0]) for i, a in enumerate(env.agents)}
-#     new_obs, new_state, reward, done, infos = env.step(key, state, actions)
-#     games[game_id]["states"].append(new_state)
-#     games[game_id]["obss"].append(new_obs)
-#     games[game_id]["rngs"].append(rng)
-#     games[game_id]["rewards"].append(reward)
-#     games[game_id]["terminated"].append(done)
-#     games[game_id]["truncated"].append(False)
-#     games[game_id]["infos"].append(infos)
-#     return
-
-
 @app.get("/games/{game_id}/state")
 async def game_state(game_id: str):
-    return games[game_id]["game_state"]
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+    game = games[game_id]
+    return {
+        "unit_positions": game.state.unit_positions.tolist(),
+        "unit_alive": game.state.unit_alive.tolist(),
+        "unit_teams": game.state.unit_teams.tolist(),
+        "unit_health": game.state.unit_health.tolist(),
+        "unit_types": game.state.unit_types.tolist(),
+        "unit_weapon_cooldowns": game.state.unit_weapon_cooldowns.tolist(),
+        "prev_attack_actions": game.state.prev_attack_actions.tolist(),
+        "time": game.state.time,
+        "terminal": game.state.terminal.tolist(),
+    }
 
 
 @app.delete("/games/{game_id}")
 def game_delete(game_id: str):
-    del games[game_id]
+    if game_id in games:
+        del games[game_id]
+    return {"message": f"Game {game_id} deleted"}
 
 
 @app.get("/games")
