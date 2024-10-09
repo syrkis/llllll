@@ -2,7 +2,7 @@
     import { onMount } from "svelte";
     import Simulation from "$lib/comps/Simulation.svelte";
     import Controller from "$lib/comps/Controller.svelte";
-    import Map from "$lib/comps/Map.svelte";
+    // import Map from "$lib/comps/Map.svelte";
     // import Visualizer from "$lib/comps/Visualizer.svelte";
 
     let message = "Loading...";
@@ -16,7 +16,7 @@
             }
             const data = await response.json();
             message = data.Hello;
-        } catch (e: any) {
+        } catch (e) {
             console.error("There was a problem with the fetch operation: " + e.message);
             error = e.message;
         }
