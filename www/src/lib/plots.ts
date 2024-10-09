@@ -4,7 +4,7 @@ import { createBackgroundGrid } from "$lib/scene";
 import { states, currentStep, intervalId, scale, gameInfo } from "$lib/store";
 import { get } from "svelte/store";
 
-const INTERVAL_DURATION = 200;
+const INTERVAL_DURATION = 600;
 
 // Helper functions
 function getScaledPosition(d: UnitData, currentScale: d3.ScaleLinear<number, number>) {
@@ -157,9 +157,23 @@ function updateAttackStreaks(
 ) {
   svg.selectAll(".streak").remove();
 
-  for (const agent of unitData) {
-    if (agent.attack === 5) {
-      const target = unitData.find((u) => u.team !== agent.team);
+  const team0Units = unitData.filter((u) => u.team === 0);
+  const team1Units = unitData.filter((u) => u.team === 1);
+
+  for (let i = 0; i < unitData.length; i++) {
+    const agent = unitData[i];
+    if (agent.attack >= 5) {
+      let target: UnitData | undefined;
+      if (agent.team === 0) {
+        // For team 0, attack the enemy unit at index (attack - 5)
+        const targetIndex = agent.attack - 5;
+        target = team1Units[targetIndex];
+      } else {
+        // For team 1, attack the ally unit at index (team0Units.length - 1 - (attack - 5))
+        const targetIndex = team0Units.length - 1 - (agent.attack - 5);
+        target = team0Units[targetIndex];
+      }
+
       if (target) {
         const { x1, y1, x2, y2 } = calculateStreakPositions(agent, target, currentScale);
         svg
