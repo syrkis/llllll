@@ -1,13 +1,31 @@
+// types.ts
 import type * as d3 from "d3";
 
 export interface Scenario {
-  num_allies: number;
-  num_enemies: number;
-  unit_type_attack_ranges: number[];
-  unit_type_sight_ranges: number[];
-  unit_type_radiuses: number[];
-  unit_type_health: number[];
-  terrain: GridData; // Ensure terrain is included
+  unit_type_info: {
+    unit_type_attack_ranges: number[];
+    unit_type_sight_ranges: number[];
+    unit_type_radiuses: number[];
+    unit_type_health: number[];
+  };
+  terrain: GridData;
+}
+
+export interface Observation {
+  [key: string]: number[] | number[][] | Observation;
+}
+
+export interface State {
+  unit_positions: number[][];
+  unit_alive: number[];
+  unit_teams: number[];
+  unit_health: number[];
+  unit_types: number[];
+  unit_weapon_cooldowns: number[];
+  prev_movement_actions: number[][];
+  prev_attack_actions: number[];
+  time: number;
+  terminal: boolean;
 }
 
 export interface UnitData {
@@ -19,26 +37,13 @@ export interface UnitData {
   attack: number;
 }
 
-export interface State {
-  unit_positions: number[][][];
-  unit_alive: number[][];
-  unit_teams: number[][];
-  unit_health: number[][];
-  unit_types: number[][];
-  unit_weapon_cooldowns: number[][];
-  prev_movement_actions: number[][][];
-  prev_attack_actions: number[][];
-  time: number[];
-  terminal: number[];
-}
-
-export type SVGSelection = d3.Selection<SVGSVGElement, unknown, null, undefined>;
-
 export type GridData = {
-  solid: boolean[][];
   water: boolean[][];
+  walls: boolean[][];
   trees: boolean[][];
 };
+
+export type SVGSelection = d3.Selection<SVGSVGElement, unknown, null, undefined>;
 
 export type CellVisualizationConfig = {
   size: number;

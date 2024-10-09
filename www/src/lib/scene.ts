@@ -3,12 +3,12 @@ import type { SVGSelection, GridData, CellVisualizationConfig, SimulationConfig 
 
 export function createBackgroundGrid(
   svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
-  gridData: GridData,
+  gridData: { water: boolean[][]; walls: boolean[][]; trees: boolean[][] },
   scale: d3.ScaleLinear<number, number> | null,
 ) {
   if (!gridData || !scale) return;
 
-  const { solid, water, trees } = gridData;
+  const { walls, water, trees } = gridData;
 
   const cellSize = scale(1) - scale(0);
   const solidTileSize = cellSize * 0.5;
@@ -16,13 +16,13 @@ export function createBackgroundGrid(
   const treeSize = cellSize * 0.1;
   const offset = (cellSize - solidTileSize) / 2; // Centering offset
 
+  // Background cells (all cells)
   svg
     .selectAll(".background-cell")
     .data(
-      solid.flat().map((isSolid, index) => ({
-        isSolid,
-        x: index % solid[0].length,
-        y: Math.floor(index / solid[0].length),
+      walls.flat().map((_, index) => ({
+        x: index % walls[0].length,
+        y: Math.floor(index / walls[0].length),
       })),
     )
     .join("rect")
@@ -33,17 +33,18 @@ export function createBackgroundGrid(
     .attr("height", cellSize)
     .attr("fill", "transparent");
 
+  // Walls (solid tiles)
   svg
     .selectAll(".solid-tile")
     .data(
-      solid
+      walls
         .flat()
-        .map((isSolid, index) => ({
-          isSolid,
-          x: index % solid[0].length,
-          y: Math.floor(index / solid[0].length),
+        .map((isWall, index) => ({
+          isWall,
+          x: index % walls[0].length,
+          y: Math.floor(index / walls[0].length),
         }))
-        .filter((d) => d.isSolid),
+        .filter((d) => d.isWall),
     )
     .join("rect")
     .attr("class", "solid-tile ink")
@@ -54,6 +55,7 @@ export function createBackgroundGrid(
     .attr("fill", "#fff")
     .attr("stroke", "none");
 
+  // Water cells
   svg
     .selectAll(".water-cell")
     .data(
@@ -74,6 +76,7 @@ export function createBackgroundGrid(
     .attr("fill", "#fff")
     .attr("stroke", "none");
 
+  // Tree cells
   svg
     .selectAll(".tree-cell")
     .data(
@@ -91,6 +94,5 @@ export function createBackgroundGrid(
     .attr("cx", (d) => scale(d.x) + cellSize / 2)
     .attr("cy", (d) => scale(d.y) + cellSize / 2)
     .attr("r", treeSize)
-    // .attr("fill", "#fff")
     .attr("stroke", "none");
 }

@@ -1,54 +1,72 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
-    import { gameId, states, gameInfo, intervalId } from "$lib/store"; // Import the stores
-    import { get } from "svelte/store";
-    import { startAnimation, updateVisualization } from "$lib/plots";
-    import { handleResize } from "$lib/utils"; // Import handleResize from utils.ts
+    import { gameStore, scale } from "$lib/store";
+    import { createGame, resetGame, stepGame } from "$lib/api";
+    import { createBackgroundGrid } from "$lib/scene";
+    import { updateVisualization } from "$lib/plots";
+    import * as d3 from "d3";
+    import type { Observation, State } from "$lib/types";
 
-    async function startGame() {
-        const response = await fetch("http://localhost:8000/run", {
-            method: "POST",
-        });
-        const data = await response.json();
-        gameId.set(data.game_id);
-        states.set(data.states);
-        gameInfo.set(data.env_info); // Update this line to set gameInfo
-        console.log(data.env_info);
-        startAnimation();
-        updateVisualization(0); // Add this line to immediately draw the background
+    const place = "Marmorkirken, Copenhagen, Denmark";
+
+    let isMounted = false;
+    let svgElement: SVGSVGElement;
+
+    function initializeScale() {
+        if (isMounted && svgElement) {
+            const width = svgElement.clientWidth;
+            const height = svgElement.clientHeight;
+            const newScale = d3
+                .scaleLinear()
+                .domain([0, 100])
+                .range([0, Math.min(width, height)]);
+            scale.set(newScale);
+        }
     }
 
-    onDestroy(() => {
-        const currentIntervalId = get(intervalId);
-        if (currentIntervalId !== null) {
-            clearInterval(currentIntervalId);
+    async function initializeGame() {
+        try {
+            const { gameId, info } = await createGame(place);
+            gameStore.setGame(gameId, info);
+            console.log("Game created with ID:", gameId);
+            console.log("Game info:", info);
+
+            initializeScale();
+
+            // Automatically reset the game
+            const { obs, state }: { obs: Observation; state: State } = await resetGame(gameId);
+            gameStore.setState(state);
+            console.log("Initial game state:", state);
+            console.log("Initial observation:", obs);
+
+            // Render the initial state
+            updateVisualization();
+        } catch (error) {
+            console.error("Error initializing or resetting game:", error);
         }
-        if (typeof window !== "undefined") {
-            window.removeEventListener("resize", handleResize);
-        }
-    });
+    }
 
     onMount(() => {
+        isMounted = true;
+        initializeGame();
         if (typeof window !== "undefined") {
-            startGame().then(() => {
-                handleResize();
-                window.addEventListener("resize", handleResize);
-            });
+            window.addEventListener("resize", initializeScale);
         }
     });
 
-    // Reactive statement to call handleResize when gameInfo is updated
-    $: if (get(gameInfo)) {
-        handleResize();
+    onDestroy(() => {
+        if (typeof window !== "undefined") {
+            window.removeEventListener("resize", initializeScale);
+        }
+    });
+
+    $: if ($gameStore.gameInfo && $scale) {
+        updateVisualization();
     }
 </script>
 
 <div id="simulation">
-    {#if !$gameId}
-        <button on:click={startGame}>run</button>
-    {:else}
-        <svg />
-    {/if}
+    <svg bind:this={svgElement}></svg>
 </div>
 
 <style>
@@ -57,12 +75,7 @@
         height: 96vh;
         width: 96vh;
     }
-    button {
-        padding: 10px 20px;
-        font-size: 16px;
-    }
     svg {
-        /* border: 2px solid; */
         height: 100%;
         width: 100%;
     }
