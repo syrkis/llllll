@@ -68,6 +68,9 @@ function updateShapes(
     const x = currentScale ? currentScale(d.position[0]) : 0;
     const y = currentScale ? currentScale(d.position[1]) : 0;
 
+    // Update class based on team
+    shape.classed("ally", d.team === 0).classed("enemy", d.team === 1);
+
     if (d.type === 0) {
       shape.transition().duration(duration).ease(d3.easeLinear).attr("cx", x).attr("cy", y);
     } else if (d.type === 1) {
@@ -95,7 +98,7 @@ function updateShapes(
       }
       return document.createElementNS("http://www.w3.org/2000/svg", "rect");
     })
-    .attr("class", "shape ink");
+    .attr("class", (d) => `shape ink ${d.team === 0 ? "ally" : "enemy"}`);
 
   // Set initial attributes for new shapes
   newShapes.each(function (d) {
