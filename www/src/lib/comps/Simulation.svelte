@@ -5,62 +5,59 @@
     import type { BaseType, EnterElement } from "d3-selection";
     import type { State, GridData, EnvInfo, UnitData } from "$lib/types";
     import { createBackgroundGrid } from "$lib/scene";
-
-    let gameId: string | null = null;
-    let states: State | null = null;
-    // let place: string | null = null;
-    let currentStep = 0;
-
-    let gridData: GridData = { solid: [], water: [], trees: [] };
-    let envInfo: EnvInfo | null = null;
-
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-    let vh = 0;
-    let scale: ScaleLinear<number, number> | null = null;
+    import { gameId, viewportHeight, states, gridData, envInfo, currentStep, intervalId, scale } from "$lib/store"; // Import the stores
+    import { get } from "svelte/store";
 
     async function startGame() {
         const response = await fetch("http://localhost:8000/run", {
             method: "POST",
         });
         const data = await response.json();
-        gameId = data.game_id;
-        states = data.states;
-        // place = data.place;
-        gridData = data.terrain;
-        envInfo = data.env_info;
-        console.log(envInfo);
+        gameId.set(data.game_id);
+        states.set(data.states);
+        gridData.set(data.terrain);
+        envInfo.set(data.env_info);
+        console.log(data.env_info);
         startAnimation();
         updateVisualization(); // Add this line to immediately draw the background
     }
 
     function startAnimation() {
-        if (intervalId !== null) {
-            clearInterval(intervalId);
+        const currentIntervalId = get(intervalId);
+        if (currentIntervalId !== null) {
+            clearInterval(currentIntervalId);
         }
-        intervalId = setInterval(() => {
-            if (states) {
-                if (currentStep < states.time.length - 1) {
-                    currentStep += 1;
-                } else {
-                    currentStep = 0;
-                }
-                updateVisualization();
-            }
-        }, 1000);
+        intervalId.set(
+            setInterval(() => {
+                states.update((currentStates) => {
+                    if (currentStates) {
+                        if (get(currentStep) < currentStates.time.length - 1) {
+                            currentStep.update((n) => n + 1);
+                        } else {
+                            currentStep.set(0);
+                        }
+                        updateVisualization();
+                    }
+                    return currentStates;
+                });
+            }, 1000),
+        );
     }
 
     function updateVisualization() {
-        if (!states || !scale) return;
+        const currentStates = get(states);
+        const currentScale = get(scale);
+        if (!currentStates || !currentScale) return;
 
         const svg = d3.select<SVGSVGElement, unknown>("svg");
-        createBackgroundGrid(svg, gridData, scale);
+        createBackgroundGrid(svg, get(gridData), currentScale);
 
-        const unitData: UnitData[] = states.unit_positions[currentStep].map((position, i) => ({
+        const unitData: UnitData[] = currentStates.unit_positions[get(currentStep)].map((position, i) => ({
             position,
-            team: states.unit_teams[currentStep][i],
-            type: states.unit_types[currentStep][i],
-            health: states.unit_health[currentStep][i],
-            attack: states.prev_attack_actions[currentStep][i],
+            team: currentStates.unit_teams[get(currentStep)][i],
+            type: currentStates.unit_types[get(currentStep)][i],
+            health: currentStates.unit_health[get(currentStep)][i],
+            attack: currentStates.prev_attack_actions[get(currentStep)][i],
         }));
 
         // Bind data to existing shapes
@@ -69,8 +66,8 @@
         // Update existing shapes
         shapes.each(function (d) {
             const shape = d3.select(this);
-            const x = scale ? scale(d.position[0]) : 0;
-            const y = scale ? scale(d.position[1]) : 0;
+            const x = currentScale ? currentScale(d.position[0]) : 0;
+            const y = currentScale ? currentScale(d.position[1]) : 0;
 
             if (d.type === 0) {
                 shape.transition().duration(300).ease(d3.easeLinear).attr("cx", x).attr("cy", y);
@@ -104,8 +101,8 @@
         // Set initial attributes for new shapes
         newShapes.each(function (d) {
             const shape = d3.select(this);
-            const x = scale ? scale(d.position[0]) : 0;
-            const y = scale ? scale(d.position[1]) : 0;
+            const x = currentScale ? currentScale(d.position[0]) : 0;
+            const y = currentScale ? currentScale(d.position[1]) : 0;
 
             if (d.type === 0) {
                 shape.attr("cx", x).attr("cy", y).attr("r", 5);
@@ -128,8 +125,8 @@
             .enter()
             .append("rect")
             .attr("class", "health-bar ink")
-            .attr("x", (d) => (scale ? scale(d.position[0]) : 0) - 5)
-            .attr("y", (d) => (scale ? scale(d.position[1]) : 0) - 15)
+            .attr("x", (d) => (currentScale ? currentScale(d.position[0]) : 0) - 5)
+            .attr("y", (d) => (currentScale ? currentScale(d.position[1]) : 0) - 15)
             .attr("width", 10)
             .attr("height", 2);
 
@@ -137,8 +134,8 @@
             .transition()
             .duration(300)
             .ease(d3.easeLinear)
-            .attr("x", (d) => (scale ? scale(d.position[0]) : 0) - 5)
-            .attr("y", (d) => (scale ? scale(d.position[1]) : 0) - 15)
+            .attr("x", (d) => (currentScale ? currentScale(d.position[0]) : 0) - 5)
+            .attr("y", (d) => (currentScale ? currentScale(d.position[1]) : 0) - 15)
             .attr("width", (d) => (d.health / 100) * 10);
 
         healthBars.exit().remove();
@@ -152,10 +149,10 @@
                 if (targetIndex !== -1) {
                     const targetData = unitData[targetIndex];
 
-                    const x1 = scale ? scale(agent.position[0]) : 0;
-                    const y1 = scale ? scale(agent.position[1]) : 0;
-                    const x2 = scale ? scale(targetData.position[0]) : 0;
-                    const y2 = scale ? scale(targetData.position[1]) : 0;
+                    const x1 = currentScale ? currentScale(agent.position[0]) : 0;
+                    const y1 = currentScale ? currentScale(agent.position[1]) : 0;
+                    const x2 = currentScale ? currentScale(targetData.position[0]) : 0;
+                    const y2 = currentScale ? currentScale(targetData.position[1]) : 0;
 
                     const offsetRatio = 0.05;
                     const dx = x2 - x1;
@@ -187,19 +184,21 @@
 
     function handleResize() {
         if (typeof window !== "undefined") {
-            vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0) * 0.96;
+            const newVh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0) * 0.96;
+            viewportHeight.set(newVh); // Update the vh store
 
             // Assuming gridData.solid contains the grid size information
-            const gridSize = gridData.solid.length > 0 ? gridData.solid[0].length : 100; // Default to 100 if no data
+            const gridSize = get(gridData).solid.length > 0 ? get(gridData).solid[0].length : 100; // Default to 100 if no data
 
-            scale = d3.scaleLinear().domain([0, gridSize]).range([0, vh]);
+            scale.set(d3.scaleLinear().domain([0, gridSize]).range([0, newVh]));
             updateVisualization();
         }
     }
 
     onDestroy(() => {
-        if (intervalId !== null) {
-            clearInterval(intervalId);
+        const currentIntervalId = get(intervalId);
+        if (currentIntervalId !== null) {
+            clearInterval(currentIntervalId);
         }
         if (typeof window !== "undefined") {
             window.removeEventListener("resize", handleResize);
@@ -216,7 +215,7 @@
 </script>
 
 <div id="simulation">
-    {#if !gameId}
+    {#if !$gameId}
         <button on:click={startGame}>run</button>
     {:else}
         <svg />
