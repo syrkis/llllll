@@ -3,19 +3,16 @@
     import * as d3 from "d3";
     import type { ScaleLinear } from "d3-scale";
     import type { BaseType, EnterElement } from "d3-selection";
-    import type { State, GridData } from "$lib/types";
+    import type { State, GridData, EnvInfo, UnitData } from "$lib/types";
     import { createBackgroundGrid } from "$lib/scene";
 
     let gameId: string | null = null;
     let states: State | null = null;
-    let place: string | null = null;
+    // let place: string | null = null;
     let currentStep = 0;
 
-    let gridData: GridData = {
-        solid: [],
-        water: [],
-        trees: [],
-    };
+    let gridData: GridData = { solid: [], water: [], trees: [] };
+    let envInfo: EnvInfo | null = null;
 
     let intervalId: ReturnType<typeof setInterval> | null = null;
     let vh = 0;
@@ -28,12 +25,10 @@
         const data = await response.json();
         gameId = data.game_id;
         states = data.states;
-        place = data.place;
-        gridData = {
-            solid: data.solid,
-            water: data.water,
-            trees: data.trees,
-        };
+        // place = data.place;
+        gridData = data.terrain;
+        envInfo = data.env_info;
+        console.log(envInfo);
         startAnimation();
         updateVisualization(); // Add this line to immediately draw the background
     }
@@ -60,32 +55,33 @@
         const svg = d3.select<SVGSVGElement, unknown>("svg");
         createBackgroundGrid(svg, gridData, scale);
 
-        const data = states.unit_positions[currentStep];
-        const teams = states.unit_teams[currentStep];
-        const types = states.unit_types[currentStep];
-        const health = states.unit_health[currentStep];
-        const attacks = states.prev_attack_actions[currentStep];
+        const unitData: UnitData[] = states.unit_positions[currentStep].map((position, i) => ({
+            position,
+            team: states.unit_teams[currentStep][i],
+            type: states.unit_types[currentStep][i],
+            health: states.unit_health[currentStep][i],
+            attack: states.prev_attack_actions[currentStep][i],
+        }));
 
         // Bind data to existing shapes
-        const shapes = svg.selectAll<SVGElement, number[]>(".shape").data(data, (d, i) => i);
+        const shapes = svg.selectAll<SVGElement, UnitData>(".shape").data(unitData, (d, i) => i);
 
         // Update existing shapes
-        shapes.each(function (d, i) {
+        shapes.each(function (d) {
             const shape = d3.select(this);
-            const type = types[i];
-            const x = scale ? scale(d[0]) : 0;
-            const y = scale ? scale(d[1]) : 0;
+            const x = scale ? scale(d.position[0]) : 0;
+            const y = scale ? scale(d.position[1]) : 0;
 
-            if (type === 0) {
+            if (d.type === 0) {
                 shape.transition().duration(300).ease(d3.easeLinear).attr("cx", x).attr("cy", y);
-            } else if (type === 1) {
+            } else if (d.type === 1) {
                 shape
                     .transition()
                     .duration(300)
                     .ease(d3.easeLinear)
                     .attr("x", x - 5)
                     .attr("y", y - 5);
-            } else if (type === 2) {
+            } else if (d.type === 2) {
                 shape
                     .transition()
                     .duration(300)
@@ -97,50 +93,43 @@
         // Append new shapes
         const newShapes = shapes
             .enter()
-            .append(function (this: EnterElement, d: number[], i: number): SVGElement {
-                const type = types[i];
-                if (type === 0) {
+            .append(function (this: EnterElement, d: UnitData): SVGElement {
+                if (d.type === 0) {
                     return document.createElementNS("http://www.w3.org/2000/svg", "circle");
                 }
                 return document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            } as (
-                this: EnterElement,
-                datum: number[],
-                index: number,
-                groups: EnterElement[] | ArrayLike<EnterElement>,
-            ) => SVGElement)
+            })
             .attr("class", "shape ink");
 
         // Set initial attributes for new shapes
-        newShapes.each(function (d, i) {
+        newShapes.each(function (d) {
             const shape = d3.select(this);
-            const type = types[i];
-            const x = scale ? scale(d[0]) : 0;
-            const y = scale ? scale(d[1]) : 0;
+            const x = scale ? scale(d.position[0]) : 0;
+            const y = scale ? scale(d.position[1]) : 0;
 
-            if (type === 0) {
+            if (d.type === 0) {
                 shape.attr("cx", x).attr("cy", y).attr("r", 5);
-            } else if (type === 1) {
+            } else if (d.type === 1) {
                 shape
                     .attr("x", x - 5)
                     .attr("y", y - 5)
                     .attr("width", 10)
                     .attr("height", 10);
-            } else if (type === 2) {
+            } else if (d.type === 2) {
                 shape.attr("points", `${x},${y - 5} ${x - 5},${y + 5} ${x + 5},${y + 5}`);
             }
         });
         shapes.exit().remove();
 
         // Health bars
-        const healthBars = svg.selectAll<SVGRectElement, number[]>(".health-bar").data(data, (d, i) => i);
+        const healthBars = svg.selectAll<SVGRectElement, UnitData>(".health-bar").data(unitData, (d, i) => i);
 
         healthBars
             .enter()
             .append("rect")
             .attr("class", "health-bar ink")
-            .attr("x", (d, i) => (scale ? scale(d[0]) : 0) - 5)
-            .attr("y", (d, i) => (scale ? scale(d[1]) : 0) - 15)
+            .attr("x", (d) => (scale ? scale(d.position[0]) : 0) - 5)
+            .attr("y", (d) => (scale ? scale(d.position[1]) : 0) - 15)
             .attr("width", 10)
             .attr("height", 2);
 
@@ -148,28 +137,25 @@
             .transition()
             .duration(300)
             .ease(d3.easeLinear)
-            .attr("x", (d, i) => (scale ? scale(d[0]) : 0) - 5)
-            .attr("y", (d, i) => (scale ? scale(d[1]) : 0) - 15)
-            .attr("width", (d, i) => (health[i] / 100) * 10);
+            .attr("x", (d) => (scale ? scale(d.position[0]) : 0) - 5)
+            .attr("y", (d) => (scale ? scale(d.position[1]) : 0) - 15)
+            .attr("width", (d) => (d.health / 100) * 10);
 
         healthBars.exit().remove();
 
         svg.selectAll(".streak").remove();
 
-        data.forEach((agent, i) => {
-            const attack = attacks[i];
-            const agentTeam = teams[i];
-            if (attack === 5) {
-                // Find the first unit of the opposite team
-                const targetIndex = data.findIndex((_, idx) => teams[idx] !== agentTeam);
+        unitData.forEach((agent, i) => {
+            if (agent.attack === 5) {
+                const targetIndex = unitData.findIndex((_, idx) => unitData[idx].team !== agent.team);
 
                 if (targetIndex !== -1) {
-                    const targetData = data[targetIndex];
+                    const targetData = unitData[targetIndex];
 
-                    const x1 = scale ? scale(agent[0]) : 0;
-                    const y1 = scale ? scale(agent[1]) : 0;
-                    const x2 = scale ? scale(targetData[0]) : 0;
-                    const y2 = scale ? scale(targetData[1]) : 0;
+                    const x1 = scale ? scale(agent.position[0]) : 0;
+                    const y1 = scale ? scale(agent.position[1]) : 0;
+                    const x2 = scale ? scale(targetData.position[0]) : 0;
+                    const y2 = scale ? scale(targetData.position[1]) : 0;
 
                     const offsetRatio = 0.05;
                     const dx = x2 - x1;

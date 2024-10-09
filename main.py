@@ -72,6 +72,26 @@ obs, state = env.reset(rng)
 rngs, states, actions = trajectory_fn(rng, env, state)
 
 
+def env_info_fn(env):
+    return tree_util.tree_map(
+        lambda x: x.tolist(),
+        {
+            "unit_type_attack_ranges": env.unit_type_attack_ranges,
+            "unit_type_sight_ranges": env.unit_type_sight_ranges,
+            "unit_type_radiuses": env.unit_type_radiuses,
+            "unit_type_health": env.unit_type_health,
+        },
+    ) | {"num_allies": env.num_allies, "num_enemies": env.num_enemies}
+
+
+def terrain_fn(env):
+    return {
+        "water": env.terrain.water.T.tolist(),
+        "solid": env.terrain.building.T.tolist(),
+        "trees": env.terrain.forest.T.tolist(),
+    }
+
+
 @app.post("/run")
 async def start_game():
     game_id = str(uuid.uuid4())
@@ -81,10 +101,8 @@ async def start_game():
         "states": tree_util.tree_map(lambda x: x.tolist(), states),
         "actions": tree_util.tree_map(lambda x: x.tolist(), actions),
         "place": place,
-        # "terrain": tree_util.tree_map(lambda x: x.tolist(), env.terrain),
-        "water": env.terrain.water.T.tolist(),
-        "solid": env.terrain.building.T.tolist(),
-        "trees": env.terrain.forest.T.tolist(),
+        "terrain": terrain_fn(env),
+        "env_info": env_info_fn(env),
         "agents": env.agents,
     }
 
