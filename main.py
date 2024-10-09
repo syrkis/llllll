@@ -41,7 +41,10 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Add your Svelte app's URL here
+    allow_origins=[
+        "http://localhost:5173",
+        "https://dancing-faun-a8a766.netlify.app/",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
