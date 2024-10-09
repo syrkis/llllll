@@ -1,12 +1,13 @@
 import type * as d3 from "d3";
 
-export interface EnvInfo {
+export interface Scenario {
   num_allies: number;
   num_enemies: number;
   unit_type_attack_ranges: number[];
   unit_type_sight_ranges: number[];
   unit_type_radiuses: number[];
   unit_type_health: number[];
+  terrain: GridData; // Ensure terrain is included
 }
 
 export interface UnitData {
@@ -44,6 +45,7 @@ export type CellVisualizationConfig = {
   shape: "rect" | "circle";
   className: string;
 };
+
 export interface CellConfig {
   size: number;
   offset: number;
@@ -59,4 +61,13 @@ export interface SimulationConfig {
     tree: CellConfig;
   };
   speed: number; // Add speed property
+}
+
+export interface GameState {
+  gameId: string | null;
+  states: State | null;
+  gameInfo: Scenario | null;
+  currentStep: number;
+  intervalId: ReturnType<typeof setInterval> | null;
+  scale: d3.ScaleLinear<number, number> | null;
 }
