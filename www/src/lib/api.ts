@@ -22,6 +22,19 @@ export async function resetGame(gameId: string): Promise<{ obs: Observation; sta
   return await response.json();
 }
 
+export async function startGame(gameId: string): Promise<void> {
+  const response = await fetch(`http://localhost:8000/games/${gameId}/start`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to start game: ${response.statusText}`);
+  }
+  const result = await response.json();
+  if (result.error) {
+    throw new Error(`Failed to start game: ${result.error}`);
+  }
+}
+
 export async function stepGame(gameId: string, action: number): Promise<State> {
   const response = await fetch(`http://localhost:8000/games/${gameId}/step`, {
     method: "POST",

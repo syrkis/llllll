@@ -1,21 +1,46 @@
 <script lang="ts">
-    // chat interface
     import Visualizer from "$lib/comps/Visualizer.svelte";
-
     import { afterUpdate } from "svelte";
+    import { createGame, resetGame, startGame } from "$lib/api";
+    import { gameStore } from "$lib/store";
 
     let history: { content: string; author: string }[] = [
         {
             content:
-                "In this scenario, the war is global, and yet fought with guns. To do your part, you must act as a C2 commander of the allies.",
+                "In this scenario, the war is global, and yet fought with guns. To do your part, you must act as a C2 commander of the allies. Type 'start' to begin the game.",
             author: "bot",
         },
     ];
 
     let input: HTMLInputElement;
-    function send() {
+    let gameId: string | null = null;
+
+    async function send() {
+        const message = input.value.trim().toLowerCase();
         history = [...history, { content: input.value, author: "user" }];
         input.value = "";
+
+        if (message === "start") {
+            try {
+                if (!gameId) {
+                    const { gameId: newGameId, info } = await createGame("Marmorkirken, Copenhagen, Denmark");
+                    gameId = newGameId;
+                    gameStore.setGame(newGameId, info);
+                    await resetGame(newGameId);
+                }
+                await startGame(gameId);
+                history = [...history, { content: "Game started successfully!", author: "bot" }];
+            } catch (error) {
+                console.error("Error starting game:", error);
+                history = [...history, { content: "Error starting game. Please try again.", author: "bot" }];
+            }
+        } else {
+            // Handle other commands or messages here
+            history = [
+                ...history,
+                { content: "Command not recognized. Type 'start' to begin the game.", author: "bot" },
+            ];
+        }
     }
 
     function handleKeydown(event: KeyboardEvent) {
@@ -47,9 +72,9 @@
         {/each}
     </div>
 
-    <!-- <div class="input">
+    <div class="input">
         <input bind:this={input} type="text" placeholder="Type a message..." on:keydown={handleKeydown} />
-    </div> -->
+    </div>
 </div>
 
 <style>
