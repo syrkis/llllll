@@ -2,7 +2,7 @@
 
 <style>
     :global(.ink) {
-        fill: black;
+        fill: none;
         stroke: black;
     }
     :global(.ink.enemy) {

@@ -1,11 +1,59 @@
 import * as d3 from "d3";
 import type { UnitData } from "$lib/types";
 import { createBackgroundGrid } from "$lib/scene";
-import { states, currentStep, intervalId, scale, gameInfo } from "$lib/store"; // Import gameInfo instead of gridData
+import { states, currentStep, intervalId, scale, gameInfo } from "$lib/store";
 import { get } from "svelte/store";
-import type { Selection, EnterElement } from "d3-selection";
+import type { Selection } from "d3-selection";
 
-const INTERVAL_DURATION = 300; // Define the interval duration
+const INTERVAL_DURATION = 200;
+
+// Helper functions
+function getScaledPosition(d: UnitData, currentScale: d3.ScaleLinear<number, number>) {
+  return {
+    x: currentScale ? currentScale(d.position[0]) : 0,
+    y: currentScale ? currentScale(d.position[1]) : 0,
+  };
+}
+
+function createShape(d: UnitData, x: number, y: number) {
+  switch (d.type) {
+    case 0:
+      return `M ${x},${y} m -5,0 a 5,5 0 1,0 10,0 a 5,5 0 1,0 -10,0`;
+    case 1:
+      return `M ${x - 5},${y - 5} h 10 v 10 h -10 z`;
+    case 2:
+      return `M ${x},${y - 5} L ${x - 5},${y + 5} L ${x + 5},${y + 5} Z`;
+    default:
+      return "";
+  }
+}
+
+function positionHealthBar(d: UnitData, currentScale: d3.ScaleLinear<number, number>) {
+  const { x, y } = getScaledPosition(d, currentScale);
+  return {
+    x: x - 5,
+    y: y - 15,
+    width: (d.health / 100) * 10,
+  };
+}
+
+function calculateStreakPositions(agent: UnitData, target: UnitData, currentScale: d3.ScaleLinear<number, number>) {
+  const start = getScaledPosition(agent, currentScale);
+  const end = getScaledPosition(target, currentScale);
+  const offsetRatio = 0.05;
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  const offsetX = (dx / length) * offsetRatio * length;
+  const offsetY = (dy / length) * offsetRatio * length;
+
+  return {
+    x1: start.x + offsetX,
+    y1: start.y + offsetY,
+    x2: end.x - offsetX,
+    y2: end.y - offsetY,
+  };
+}
 
 export function startAnimation() {
   const currentIntervalId = get(intervalId);
@@ -16,11 +64,7 @@ export function startAnimation() {
     setInterval(() => {
       states.update((currentStates) => {
         if (currentStates) {
-          if (get(currentStep) < currentStates.time.length - 1) {
-            currentStep.update((n) => n + 1);
-          } else {
-            currentStep.set(0);
-          }
+          currentStep.update((n) => (n < currentStates.time.length - 1 ? n + 1 : 0));
           updateVisualization(INTERVAL_DURATION);
         }
         return currentStates;
@@ -32,20 +76,21 @@ export function startAnimation() {
 export function updateVisualization(duration: number) {
   const currentStates = get(states);
   const currentScale = get(scale);
-  const currentGameInfo = get(gameInfo); // Get the current gameInfo
+  const currentGameInfo = get(gameInfo);
   if (!currentStates || !currentScale || !currentGameInfo) return;
 
-  console.log("Current GameInfo in updateVisualization:", currentGameInfo); // Add detailed logging
+  console.log("Current GameInfo in updateVisualization:", currentGameInfo);
 
-  const svg = d3.select<SVGSVGElement, unknown>("svg") as unknown as Selection<SVGSVGElement, unknown, null, undefined>;
-  createBackgroundGrid(svg, currentGameInfo.terrain, currentScale); // Use terrain from gameInfo
+  const svg = d3.select<SVGSVGElement, unknown>("svg");
+  createBackgroundGrid(svg, currentGameInfo.terrain, currentScale);
 
-  const unitData: UnitData[] = currentStates.unit_positions[get(currentStep)].map((position, i) => ({
+  const step = get(currentStep);
+  const unitData: UnitData[] = currentStates.unit_positions[step].map((position, i) => ({
     position,
-    team: currentStates.unit_teams[get(currentStep)][i],
-    type: currentStates.unit_types[get(currentStep)][i],
-    health: currentStates.unit_health[get(currentStep)][i],
-    attack: currentStates.prev_attack_actions[get(currentStep)][i],
+    team: currentStates.unit_teams[step][i],
+    type: currentStates.unit_types[step][i],
+    health: currentStates.unit_health[step][i],
+    attack: currentStates.prev_attack_actions[step][i],
   }));
 
   updateShapes(svg, unitData, currentScale, duration);
@@ -54,147 +99,83 @@ export function updateVisualization(duration: number) {
 }
 
 function updateShapes(
-  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+  svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
   unitData: UnitData[],
   currentScale: d3.ScaleLinear<number, number>,
   duration: number,
 ) {
-  // Bind data to existing shapes
-  const shapes = svg.selectAll<SVGElement, UnitData>(".shape").data(unitData, (d, i) => i);
+  const shapes = svg.selectAll<SVGPathElement, UnitData>(".shape").data(unitData, (d, i) => i.toString());
 
-  // Update existing shapes
-  shapes.each(function (d) {
-    const shape = d3.select(this);
-    const x = currentScale ? currentScale(d.position[0]) : 0;
-    const y = currentScale ? currentScale(d.position[1]) : 0;
-
-    // Update class based on team
-    shape.classed("ally", d.team === 0).classed("enemy", d.team === 1);
-
-    if (d.type === 0) {
-      shape.transition().duration(duration).ease(d3.easeLinear).attr("cx", x).attr("cy", y);
-    } else if (d.type === 1) {
-      shape
-        .transition()
-        .duration(duration)
-        .ease(d3.easeLinear)
-        .attr("x", x - 5)
-        .attr("y", y - 5);
-    } else if (d.type === 2) {
-      shape
-        .transition()
-        .duration(duration)
-        .ease(d3.easeLinear)
-        .attr("points", `${x},${y - 5} ${x - 5},${y + 5} ${x + 5},${y + 5}`);
-    }
-  });
-
-  // Append new shapes
-  const newShapes = shapes
+  shapes
     .enter()
-    .append(function (this: EnterElement, d: UnitData): SVGElement {
-      if (d.type === 0) {
-        return document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      }
-      return document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    })
-    .attr("class", (d) => `shape ink ${d.team === 0 ? "ally" : "enemy"}`);
+    .append("path")
+    .attr("class", (d) => `shape ink ${d.team === 0 ? "ally" : "enemy"}`)
+    .merge(shapes)
+    .transition()
+    .duration(duration)
+    .ease(d3.easeLinear)
+    .attr("d", (d) => {
+      const { x, y } = getScaledPosition(d, currentScale);
+      return createShape(d, x, y);
+    });
 
-  // Set initial attributes for new shapes
-  newShapes.each(function (d) {
-    const shape = d3.select(this);
-    const x = currentScale ? currentScale(d.position[0]) : 0;
-    const y = currentScale ? currentScale(d.position[1]) : 0;
-
-    if (d.type === 0) {
-      shape.attr("cx", x).attr("cy", y).attr("r", 5);
-    } else if (d.type === 1) {
-      shape
-        .attr("x", x - 5)
-        .attr("y", y - 5)
-        .attr("width", 10)
-        .attr("height", 10);
-    } else if (d.type === 2) {
-      shape.attr("points", `${x},${y - 5} ${x - 5},${y + 5} ${x + 5},${y + 5}`);
-    }
-  });
   shapes.exit().remove();
 }
 
 function updateHealthBars(
-  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+  svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
   unitData: UnitData[],
   currentScale: d3.ScaleLinear<number, number>,
   duration: number,
 ) {
-  // Health bars
-  const healthBars = svg.selectAll<SVGRectElement, UnitData>(".health-bar").data(unitData, (d, i) => i);
+  const healthBars = svg.selectAll<SVGRectElement, UnitData>(".health-bar").data(unitData, (d, i) => i.toString());
 
   healthBars
     .enter()
     .append("rect")
     .attr("class", "health-bar ink")
-    .attr("x", (d) => (currentScale ? currentScale(d.position[0]) : 0) - 5)
-    .attr("y", (d) => (currentScale ? currentScale(d.position[1]) : 0) - 15)
-    .attr("width", 10)
-    .attr("height", 2);
-
-  healthBars
+    .merge(healthBars)
     .transition()
     .duration(duration)
     .ease(d3.easeLinear)
-    .attr("x", (d) => (currentScale ? currentScale(d.position[0]) : 0) - 5)
-    .attr("y", (d) => (currentScale ? currentScale(d.position[1]) : 0) - 15)
-    .attr("width", (d) => (d.health / 100) * 10);
+    .attr("x", (d) => positionHealthBar(d, currentScale).x)
+    .attr("y", (d) => positionHealthBar(d, currentScale).y)
+    .attr("width", (d) => positionHealthBar(d, currentScale).width)
+    .attr("height", 2);
 
   healthBars.exit().remove();
 }
 
 function updateAttackStreaks(
-  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+  svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
   unitData: UnitData[],
   currentScale: d3.ScaleLinear<number, number>,
   duration: number,
 ) {
   svg.selectAll(".streak").remove();
 
-  unitData.forEach((agent, i) => {
+  for (const agent of unitData) {
     if (agent.attack === 5) {
-      const targetIndex = unitData.findIndex((_, idx) => unitData[idx].team !== agent.team);
-
-      if (targetIndex !== -1) {
-        const targetData = unitData[targetIndex];
-
-        const x1 = currentScale ? currentScale(agent.position[0]) : 0;
-        const y1 = currentScale ? currentScale(agent.position[1]) : 0;
-        const x2 = currentScale ? currentScale(targetData.position[0]) : 0;
-        const y2 = currentScale ? currentScale(targetData.position[1]) : 0;
-
-        const offsetRatio = 0.05;
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const length = Math.sqrt(dx * dx + dy * dy);
-
-        const offsetX = (dx / length) * offsetRatio * length;
-        const offsetY = (dy / length) * offsetRatio * length;
-
+      const target = unitData.find((u) => u.team !== agent.team);
+      if (target) {
+        const { x1, y1, x2, y2 } = calculateStreakPositions(agent, target, currentScale);
         svg
           .append("line")
           .attr("class", "streak ink")
-          .attr("x1", x1 + offsetX)
-          .attr("y1", y1 + offsetY)
-          .attr("x2", x1 + offsetX)
-          .attr("y2", y1 + offsetY)
+          .attr("x1", x1)
+          .attr("y1", y1)
+          .attr("x2", x1)
+          .attr("y2", y1)
           .attr("stroke-width", 3)
           .attr("stroke-opacity", 0.6)
           .transition()
           .duration(duration)
           .ease(d3.easeLinear)
-          .attr("x2", x2 - offsetX)
-          .attr("y2", y2 - offsetY)
+          .attr("x2", x2)
+          .attr("y2", y2)
           .attr("stroke-opacity", 0)
           .remove();
       }
     }
-  });
+  }
 }

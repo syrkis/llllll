@@ -2,7 +2,7 @@ import type * as d3 from "d3";
 import type { SVGSelection, GridData, CellVisualizationConfig, SimulationConfig } from "$lib/types";
 
 export function createBackgroundGrid(
-  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+  svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
   gridData: GridData,
   scale: d3.ScaleLinear<number, number> | null,
 ) {
