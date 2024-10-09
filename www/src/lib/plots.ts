@@ -5,6 +5,8 @@ import { states, currentStep, intervalId, scale, gameInfo } from "$lib/store"; /
 import { get } from "svelte/store";
 import type { Selection, EnterElement } from "d3-selection";
 
+const INTERVAL_DURATION = 300; // Define the interval duration
+
 export function startAnimation() {
   const currentIntervalId = get(intervalId);
   if (currentIntervalId !== null) {
@@ -19,19 +21,21 @@ export function startAnimation() {
           } else {
             currentStep.set(0);
           }
-          updateVisualization();
+          updateVisualization(INTERVAL_DURATION);
         }
         return currentStates;
       });
-    }, 1000),
+    }, INTERVAL_DURATION),
   );
 }
 
-export function updateVisualization() {
+export function updateVisualization(duration: number) {
   const currentStates = get(states);
   const currentScale = get(scale);
   const currentGameInfo = get(gameInfo); // Get the current gameInfo
   if (!currentStates || !currentScale || !currentGameInfo) return;
+
+  console.log("Current GameInfo in updateVisualization:", currentGameInfo); // Add detailed logging
 
   const svg = d3.select<SVGSVGElement, unknown>("svg") as unknown as Selection<SVGSVGElement, unknown, null, undefined>;
   createBackgroundGrid(svg, currentGameInfo.terrain, currentScale); // Use terrain from gameInfo
@@ -44,6 +48,17 @@ export function updateVisualization() {
     attack: currentStates.prev_attack_actions[get(currentStep)][i],
   }));
 
+  updateShapes(svg, unitData, currentScale, duration);
+  updateHealthBars(svg, unitData, currentScale, duration);
+  updateAttackStreaks(svg, unitData, currentScale, duration);
+}
+
+function updateShapes(
+  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+  unitData: UnitData[],
+  currentScale: d3.ScaleLinear<number, number>,
+  duration: number,
+) {
   // Bind data to existing shapes
   const shapes = svg.selectAll<SVGElement, UnitData>(".shape").data(unitData, (d, i) => i);
 
@@ -54,18 +69,18 @@ export function updateVisualization() {
     const y = currentScale ? currentScale(d.position[1]) : 0;
 
     if (d.type === 0) {
-      shape.transition().duration(300).ease(d3.easeLinear).attr("cx", x).attr("cy", y);
+      shape.transition().duration(duration).ease(d3.easeLinear).attr("cx", x).attr("cy", y);
     } else if (d.type === 1) {
       shape
         .transition()
-        .duration(300)
+        .duration(duration)
         .ease(d3.easeLinear)
         .attr("x", x - 5)
         .attr("y", y - 5);
     } else if (d.type === 2) {
       shape
         .transition()
-        .duration(300)
+        .duration(duration)
         .ease(d3.easeLinear)
         .attr("points", `${x},${y - 5} ${x - 5},${y + 5} ${x + 5},${y + 5}`);
     }
@@ -101,7 +116,14 @@ export function updateVisualization() {
     }
   });
   shapes.exit().remove();
+}
 
+function updateHealthBars(
+  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+  unitData: UnitData[],
+  currentScale: d3.ScaleLinear<number, number>,
+  duration: number,
+) {
   // Health bars
   const healthBars = svg.selectAll<SVGRectElement, UnitData>(".health-bar").data(unitData, (d, i) => i);
 
@@ -116,14 +138,21 @@ export function updateVisualization() {
 
   healthBars
     .transition()
-    .duration(300)
+    .duration(duration)
     .ease(d3.easeLinear)
     .attr("x", (d) => (currentScale ? currentScale(d.position[0]) : 0) - 5)
     .attr("y", (d) => (currentScale ? currentScale(d.position[1]) : 0) - 15)
     .attr("width", (d) => (d.health / 100) * 10);
 
   healthBars.exit().remove();
+}
 
+function updateAttackStreaks(
+  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+  unitData: UnitData[],
+  currentScale: d3.ScaleLinear<number, number>,
+  duration: number,
+) {
   svg.selectAll(".streak").remove();
 
   unitData.forEach((agent, i) => {
@@ -156,7 +185,7 @@ export function updateVisualization() {
           .attr("stroke-width", 3)
           .attr("stroke-opacity", 0.6)
           .transition()
-          .duration(1000)
+          .duration(duration)
           .ease(d3.easeLinear)
           .attr("x2", x2 - offsetX)
           .attr("y2", y2 - offsetY)

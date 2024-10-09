@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
-    import { gameId, viewportHeight, states, gameInfo, currentStep, intervalId, scale } from "$lib/store"; // Import the stores
+    import { gameId, states, gameInfo, intervalId } from "$lib/store"; // Import the stores
     import { get } from "svelte/store";
     import { startAnimation, updateVisualization } from "$lib/plots";
     import { handleResize } from "$lib/utils"; // Import handleResize from utils.ts
