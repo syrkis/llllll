@@ -15,6 +15,7 @@ export interface UnitData {
   team: number;
   type: number;
   health: number;
+  maxHealth: number;
   attack: number;
 }
 

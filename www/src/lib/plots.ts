@@ -1,9 +1,8 @@
 import * as d3 from "d3";
-import type { UnitData } from "$lib/types";
+import type { UnitData, Scenario } from "$lib/types";
 import { createBackgroundGrid } from "$lib/scene";
 import { states, currentStep, intervalId, scale, gameInfo } from "$lib/store";
 import { get } from "svelte/store";
-import type { Selection } from "d3-selection";
 
 const INTERVAL_DURATION = 200;
 
@@ -15,14 +14,14 @@ function getScaledPosition(d: UnitData, currentScale: d3.ScaleLinear<number, num
   };
 }
 
-function createShape(d: UnitData, x: number, y: number) {
+function createShape(d: UnitData, x: number, y: number, radius: number) {
   switch (d.type) {
     case 0:
-      return `M ${x},${y} m -5,0 a 5,5 0 1,0 10,0 a 5,5 0 1,0 -10,0`;
+      return `M ${x},${y} m -${radius},0 a ${radius},${radius} 0 1,0 ${radius * 2},0 a ${radius},${radius} 0 1,0 -${radius * 2},0`;
     case 1:
-      return `M ${x - 5},${y - 5} h 10 v 10 h -10 z`;
+      return `M ${x - radius},${y - radius} h ${radius * 2} v ${radius * 2} h -${radius * 2} z`;
     case 2:
-      return `M ${x},${y - 5} L ${x - 5},${y + 5} L ${x + 5},${y + 5} Z`;
+      return `M ${x},${y - radius} L ${x - radius},${y + radius} L ${x + radius},${y + radius} Z`;
     default:
       return "";
   }
@@ -30,10 +29,11 @@ function createShape(d: UnitData, x: number, y: number) {
 
 function positionHealthBar(d: UnitData, currentScale: d3.ScaleLinear<number, number>) {
   const { x, y } = getScaledPosition(d, currentScale);
+  const normalizedHealth = d.health / d.maxHealth;
   return {
     x: x - 5,
     y: y - 15,
-    width: (d.health / 100) * 10,
+    width: normalizedHealth * 10, // Multiply by 10 to keep the same visual scale
   };
 }
 
@@ -90,10 +90,11 @@ export function updateVisualization(duration: number) {
     team: currentStates.unit_teams[step][i],
     type: currentStates.unit_types[step][i],
     health: currentStates.unit_health[step][i],
+    maxHealth: currentGameInfo.unit_type_health[currentStates.unit_types[step][i]],
     attack: currentStates.prev_attack_actions[step][i],
   }));
 
-  updateShapes(svg, unitData, currentScale, duration);
+  updateShapes(svg, unitData, currentScale, currentGameInfo, duration);
   updateHealthBars(svg, unitData, currentScale, duration);
   updateAttackStreaks(svg, unitData, currentScale, duration);
 }
@@ -102,6 +103,7 @@ function updateShapes(
   svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
   unitData: UnitData[],
   currentScale: d3.ScaleLinear<number, number>,
+  gameInfo: Scenario,
   duration: number,
 ) {
   const shapes = svg.selectAll<SVGPathElement, UnitData>(".shape").data(unitData, (d, i) => i.toString());
@@ -109,14 +111,15 @@ function updateShapes(
   shapes
     .enter()
     .append("path")
-    .attr("class", (d) => `shape ink ${d.team === 0 ? "ally" : "enemy"}`)
+    .attr("class", (d) => `shape ink type-${d.type} ${d.team === 0 ? "ally" : "enemy"}`)
     .merge(shapes)
     .transition()
     .duration(duration)
     .ease(d3.easeLinear)
     .attr("d", (d) => {
       const { x, y } = getScaledPosition(d, currentScale);
-      return createShape(d, x, y);
+      const radius = currentScale(gameInfo.unit_type_radiuses[d.type]);
+      return createShape(d, x, y, radius);
     });
 
   shapes.exit().remove();
