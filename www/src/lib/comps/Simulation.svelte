@@ -15,7 +15,7 @@
         gameInfo.set(data.env_info); // Update this line to set gameInfo
         console.log(data.env_info);
         startAnimation();
-        updateVisualization(100); // Add this line to immediately draw the background
+        updateVisualization(0); // Add this line to immediately draw the background
     }
 
     onDestroy(() => {

@@ -20,6 +20,6 @@ export function handleResize() {
     const gridSize = currentGameInfo.terrain.solid.length > 0 ? currentGameInfo.terrain.solid[0].length : 100; // Default to 100 if no data
 
     scale.set(d3.scaleLinear().domain([0, gridSize]).range([0, newVh]));
-    updateVisualization(100);
+    updateVisualization(0);
   }
 }
