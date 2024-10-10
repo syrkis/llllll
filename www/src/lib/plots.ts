@@ -40,25 +40,21 @@ function updateShapes(
   unitTypeInfo: Scenario["unit_type_info"],
   currentScale: d3.ScaleLinear<number, number>,
 ) {
-  // console.log("Updating shapes with unit data:", unitData);
   const shapes = svg.selectAll<SVGPathElement, UnitData>(".shape").data(unitData, (d, i) => i.toString());
+
+  const duration = 750; // Adjust the duration as needed for smoother transitions
 
   shapes
     .enter()
     .append("path")
     .attr("class", (d) => `shape ink type-${d.type} ${d.team === 0 ? "ally" : "enemy"}`)
     .merge(shapes)
+    .transition() // Start a transition
+    .duration(duration) // Set the duration for the transition
     .attr("d", (d, i, nodes) => {
       const { x, y } = getPosition(d, currentScale);
       const radius = currentScale(unitTypeInfo.unit_type_radiuses[d.type]);
-      const oldD = d3.select(nodes[i]).attr("d");
-      const newD = createUnitShape(d, x, y, radius);
-      if (oldD !== newD) {
-        // console.log(`Shape ${i} updated: type=${d.type}, position=(${x}, ${y}), radius=${radius}`);
-      } else {
-        // console.log(`Shape ${i} not changed: type=${d.type}, position=(${x}, ${y}), radius=${radius}`);
-      }
-      return newD;
+      return createUnitShape(d, x, y, radius);
     });
 
   shapes.exit().remove();
@@ -71,11 +67,15 @@ function updateHealthBars(
 ) {
   const healthBars = svg.selectAll<SVGRectElement, UnitData>(".health-bar").data(unitData, (d, i) => i.toString());
 
+  const duration = 750; // Use the same duration for consistency
+
   healthBars
     .enter()
     .append("rect")
     .attr("class", "health-bar ink")
     .merge(healthBars)
+    .transition() // Transition for smooth health bar updates
+    .duration(duration)
     .attr("x", (d) => positionHealthBar(d, currentScale).x)
     .attr("y", (d) => positionHealthBar(d, currentScale).y)
     .attr("width", (d) => positionHealthBar(d, currentScale).width)
