@@ -1,8 +1,9 @@
 <script lang="ts">
-    import Visualizer from "$lib/comps/Visualizer.svelte";
-    import { afterUpdate } from "svelte";
+    import { onDestroy } from "svelte";
     import { createGame, resetGame, startGame } from "$lib/api";
     import { gameStore } from "$lib/store";
+    import { updateVisualization } from "$lib/plots";
+    import type { State } from "$lib/types";
 
     let history: { content: string; author: string }[] = [
         {
@@ -14,6 +15,31 @@
 
     let input: HTMLInputElement;
     let gameId: string | null = null;
+    let socket: WebSocket | null = null;
+
+    function setupWebSocket(gameId: string) {
+        socket = new WebSocket(`ws://localhost:8000/ws/${gameId}`);
+        socket.onopen = () => {
+            console.log("WebSocket connection established");
+        };
+        socket.onmessage = (event) => {
+            console.log("Received WebSocket message:", event.data);
+            try {
+                const state: State = JSON.parse(event.data);
+                console.log("Parsed state:", state);
+                gameStore.setState(state);
+                updateVisualization();
+            } catch (error) {
+                console.error("Error parsing WebSocket message:", error);
+            }
+        };
+        socket.onerror = (error) => {
+            console.error("WebSocket error:", error);
+        };
+        socket.onclose = (event) => {
+            console.log("WebSocket closed:", event);
+        };
+    }
 
     async function send() {
         const message = input.value.trim().toLowerCase();
@@ -29,6 +55,7 @@
                     await resetGame(newGameId);
                 }
                 await startGame(gameId);
+                setupWebSocket(gameId); // Call setupWebSocket here
                 history = [...history, { content: "Game started successfully!", author: "bot" }];
             } catch (error) {
                 console.error("Error starting game:", error);
@@ -51,12 +78,9 @@
 
     let historyContainer: HTMLDivElement;
 
-    afterUpdate(() => {
-        if (historyContainer) {
-            const lastMessage = historyContainer.lastElementChild;
-            if (lastMessage) {
-                lastMessage.scrollIntoView({ behavior: "smooth" });
-            }
+    onDestroy(() => {
+        if (socket) {
+            socket.close();
         }
     });
 </script>

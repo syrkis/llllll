@@ -7,15 +7,15 @@ import { get } from "svelte/store";
 export function updateVisualization() {
   const { currentState, gameInfo } = get(gameStore);
   const currentScale = get(scale);
-  console.log("updateVisualization called with:", { currentState, gameInfo, currentScale });
+  // console.log("updateVisualization called with:", { currentState, gameInfo, currentScale });
 
   if (!currentState || !gameInfo || !currentScale) {
-    console.log("Missing data for visualization, returning early");
+    // console.log("Missing data for visualization, returning early");
     return;
   }
 
-  console.log("Current GameInfo in updateVisualization:", gameInfo);
-  console.log("Current State in updateVisualization:", currentState);
+  // console.log("Current GameInfo in updateVisualization:", gameInfo);
+  // console.log("Current State in updateVisualization:", currentState);
 
   const svg = d3.select<SVGSVGElement, unknown>("svg");
   createBackgroundGrid(svg, gameInfo.terrain, currentScale);
@@ -29,8 +29,6 @@ export function updateVisualization() {
     attack: currentState.prev_attack_actions[i],
   }));
 
-  console.log("Unit data for visualization:", unitData);
-
   updateShapes(svg, unitData, gameInfo.unit_type_info, currentScale);
   updateHealthBars(svg, unitData, currentScale);
   updateAttackStreaks(svg, unitData, currentScale);
@@ -42,7 +40,7 @@ function updateShapes(
   unitTypeInfo: Scenario["unit_type_info"],
   currentScale: d3.ScaleLinear<number, number>,
 ) {
-  console.log("Updating shapes with unit data:", unitData);
+  // console.log("Updating shapes with unit data:", unitData);
   const shapes = svg.selectAll<SVGPathElement, UnitData>(".shape").data(unitData, (d, i) => i.toString());
 
   shapes
@@ -56,9 +54,9 @@ function updateShapes(
       const oldD = d3.select(nodes[i]).attr("d");
       const newD = createUnitShape(d, x, y, radius);
       if (oldD !== newD) {
-        console.log(`Shape ${i} updated: type=${d.type}, position=(${x}, ${y}), radius=${radius}`);
+        // console.log(`Shape ${i} updated: type=${d.type}, position=(${x}, ${y}), radius=${radius}`);
       } else {
-        console.log(`Shape ${i} not changed: type=${d.type}, position=(${x}, ${y}), radius=${radius}`);
+        // console.log(`Shape ${i} not changed: type=${d.type}, position=(${x}, ${y}), radius=${radius}`);
       }
       return newD;
     });

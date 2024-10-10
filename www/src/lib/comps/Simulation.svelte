@@ -1,8 +1,7 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
     import { gameStore, scale } from "$lib/store";
-    import { get } from "svelte/store";
-    import { createGame, resetGame, startGame } from "$lib/api";
+    import { createGame, resetGame } from "$lib/api";
     import { createBackgroundGrid } from "$lib/scene";
     import { updateVisualization } from "$lib/plots";
     import * as d3 from "d3";
@@ -12,24 +11,7 @@
 
     let isMounted = false;
     let svgElement: SVGSVGElement;
-    let socket: WebSocket;
 
-    function setupWebSocket(gameId: string) {
-        socket = new WebSocket(`ws://localhost:8000/ws/${gameId}`);
-        socket.onopen = () => {
-            console.log("WebSocket connection established");
-        };
-        socket.onmessage = (event) => {
-            console.log("Received WebSocket message:", event.data);
-            const state: State = JSON.parse(event.data);
-            console.log("Parsed state:", state);
-            console.log("New unit positions:", state.unit_positions);
-            gameStore.setState(state);
-            console.log("Updated game store state:", get(gameStore).currentState);
-            updateVisualization();
-        };
-        // ... (keep other WebSocket handlers)
-    }
     function initializeScale() {
         if (isMounted && svgElement) {
             const width = svgElement.clientWidth;
@@ -56,9 +38,6 @@
             console.log("Initial game state:", state);
             console.log("Initial observation:", obs);
 
-            // Set up WebSocket connection
-            setupWebSocket(gameId);
-
             // Render the initial state
             updateVisualization();
         } catch (error) {
@@ -69,6 +48,7 @@
     onMount(() => {
         isMounted = true;
         initializeGame();
+        createBackgroundGrid();
         if (typeof window !== "undefined") {
             window.addEventListener("resize", initializeScale);
         }
@@ -77,9 +57,6 @@
     onDestroy(() => {
         if (typeof window !== "undefined") {
             window.removeEventListener("resize", initializeScale);
-        }
-        if (socket) {
-            socket.close();
         }
     });
 

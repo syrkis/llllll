@@ -35,16 +35,16 @@ export async function startGame(gameId: string): Promise<void> {
   }
 }
 
-export async function stepGame(gameId: string, action: number): Promise<State> {
-  const response = await fetch(`http://localhost:8000/games/${gameId}/step`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ action }),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to step game: ${response.statusText}`);
-  }
-  return await response.json();
-}
+// export async function stepGame(gameId: string, action: number): Promise<State> {
+//   const response = await fetch(`http://localhost:8000/games/${gameId}/step`, {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//     },
+//     body: JSON.stringify({ action }),
+//   });
+//   if (!response.ok) {
+//     throw new Error(`Failed to step game: ${response.statusText}`);
+//   }
+//   return await response.json();
+// }
