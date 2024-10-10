@@ -11,6 +11,19 @@ export interface Scenario {
   terrain: number[][]; // Update to use a unified terrain matrix
 }
 
+export const emptyState: State = {
+  unit_positions: [],
+  unit_alive: [],
+  unit_teams: [],
+  unit_health: [],
+  unit_types: [],
+  unit_weapon_cooldowns: [],
+  prev_movement_actions: [],
+  prev_attack_actions: [],
+  time: 0,
+  terminal: true,
+};
+
 export interface Observation {
   [key: string]: number[] | number[][] | Observation;
 }

@@ -1,6 +1,8 @@
+// In store.ts
 import { writable } from "svelte/store";
 import type { State, Scenario, GridData } from "$lib/types";
 import type { ScaleLinear } from "d3-scale";
+import { emptyState } from "./types"; // import emptyState from types.ts
 
 export interface GameStore {
   gameId: string | null;
@@ -18,7 +20,7 @@ const initialTerrain: number[][] = Array.from({ length: 100 }, (_, rowIndex) =>
 
 const initialGameStore: GameStore = {
   gameId: null,
-  currentState: null,
+  currentState: emptyState, // Use the empty state here as an initial state
   gameInfo: null,
   terrain: initialTerrain,
 };
@@ -33,7 +35,7 @@ function createGameStore() {
     setGame: (gameId: string, gameInfo: Scenario) => update((state) => ({ ...state, gameId, gameInfo })),
     setTerrain: (terrain: GridData) => update((state) => ({ ...state, terrain })),
     setState: (currentState: State) => update((state) => ({ ...state, currentState })),
-    reset: () => set(initialGameStore),
+    reset: () => set({ ...initialGameStore, currentState: emptyState }),
   };
 }
 

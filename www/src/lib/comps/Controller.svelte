@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onDestroy } from "svelte";
+    import { onDestroy, tick } from "svelte"; // Import tick
     import { gameStore } from "$lib/store";
     import { createGame, resetGame, startGame, pauseGame, stepGame, quitGame } from "$lib/api";
     import { updateVisualization } from "$lib/plots";
@@ -52,7 +52,7 @@
             switch (command.toLowerCase()) {
                 case "make":
                 case "m":
-                    if (get(gameStore).gameId) await quitGame(get(gameStore).gameId);
+                    if (get(gameStore).gameId) await quitGame(get(gameStore).gameId!); // Use non-null assertion
                     try {
                         const { gameId, info }: { gameId: string; info: Scenario } = await createGame(place);
                         gameStore.setGame(gameId, info);
@@ -147,7 +147,12 @@
                         try {
                             await quitGame(gameId);
                             socket?.close();
-                            history = [...history, { content: "Game simulation ended.", author: "bot" }];
+                            gameStore.reset(); // This will use the empty state
+                            updateVisualization(); // Update visuals to clear the grid
+                            history = [
+                                ...history,
+                                { content: "Game simulation ended and grid reset to initial state.", author: "bot" },
+                            ];
                         } catch (error) {
                             console.error("Error quitting the game:", error);
                             history = [
@@ -183,14 +188,21 @@
 
     let historyContainer: HTMLDivElement;
 
+    async function scrollToBottom() {
+        await tick(); // Wait for DOM update
+        if (historyContainer) {
+            historyContainer.scrollTop = historyContainer.scrollHeight;
+        }
+    }
+
+    $: history, scrollToBottom();
+
     onDestroy(() => {
         if (socket) {
             socket.close();
         }
     });
 </script>
-
-<!-- Your existing HTML and CSS setup should remain unaffected by this refactoring -->
 
 <div id="controller">
     <div class="history" bind:this={historyContainer}>
@@ -221,6 +233,8 @@
         overflow-y: auto;
         flex-grow: 1;
         margin-bottom: 1rem;
+        /*// history should always be scrolled down to the latest message--> &*/
+        scroll-behavior: smooth;
     }
 
     .bot {
