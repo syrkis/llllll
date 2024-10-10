@@ -1,9 +1,10 @@
 <script lang="ts">
     import { onDestroy } from "svelte";
-    import { createGame, resetGame, startGame } from "$lib/api";
     import { gameStore } from "$lib/store";
+    import { startGame } from "$lib/api";
     import { updateVisualization } from "$lib/plots";
     import type { State } from "$lib/types";
+    import { get } from "svelte/store"; // Import the `get` function
 
     let history: { content: string; author: string }[] = [
         {
@@ -14,7 +15,6 @@
     ];
 
     let input: HTMLInputElement;
-    let gameId: string | null = null;
     let socket: WebSocket | null = null;
 
     function setupWebSocket(gameId: string) {
@@ -48,21 +48,22 @@
 
         if (message === "start") {
             try {
-                if (!gameId) {
-                    const { gameId: newGameId, info } = await createGame("Dronning Louises Bro, Copenhagen, Denmark"); // Should be done in Simulation
-                    gameId = newGameId;
-                    gameStore.setGame(newGameId, info);
-                    await resetGame(newGameId);
+                const { gameId } = get(gameStore); // Get gameId from the store
+                if (gameId) {
+                    await startGame(gameId);
+                    setupWebSocket(gameId);
+                    history = [...history, { content: "Game started successfully!", author: "bot" }];
+                } else {
+                    history = [
+                        ...history,
+                        { content: "Game not initialized. Please refresh or try again.", author: "bot" },
+                    ];
                 }
-                await startGame(gameId);
-                setupWebSocket(gameId); // Call setupWebSocket here
-                history = [...history, { content: "Game started successfully!", author: "bot" }];
             } catch (error) {
                 console.error("Error starting game:", error);
                 history = [...history, { content: "Error starting game. Please try again.", author: "bot" }];
             }
         } else {
-            // Handle other commands or messages here
             history = [
                 ...history,
                 { content: "Command not recognized. Type 'start' to begin the game.", author: "bot" },
@@ -84,6 +85,8 @@
         }
     });
 </script>
+
+<!-- Remaining HTML and CSS here... -->
 
 <div id="controller">
     <div class="history" bind:this={historyContainer}>
