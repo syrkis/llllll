@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onDestroy, tick } from "svelte"; // Import tick
+    import { onDestroy, tick } from "svelte";
     import { gameStore } from "$lib/store";
     import { createGame, resetGame, startGame, pauseGame, stepGame, quitGame } from "$lib/api";
     import { updateVisualization } from "$lib/plots";
@@ -41,18 +41,37 @@
 
     async function send() {
         const message = input.value.trim();
-        history = [...history, { content: input.value, author: "user" }];
-        input.value = "";
+        input.value = ""; // Clear input field
+
+        const { gameId } = get(gameStore);
+
+        // If the input message is empty, treat it as a step command
+        if (!message && gameId) {
+            try {
+                const state = await stepGame(gameId);
+                gameStore.setState(state);
+                updateVisualization();
+                // Do not update history
+            } catch (error) {
+                console.error("Error stepping the game:", error);
+                history = [...history, { content: "Error stepping the game. Please try again.", author: "bot" }];
+            }
+            return;
+        }
+
+        // Add user message to history
+        history = [...history, { content: message, author: "user" }];
 
         if (message.startsWith("|")) {
             const [command, ...args] = message.slice(1).trim().split(" ");
             const place = args.join(" ").trim() || "Abel Cathrines Gade, Copenhagen, Denmark";
-            const { gameId } = get(gameStore);
 
             switch (command.toLowerCase()) {
                 case "make":
                 case "m":
-                    if (get(gameStore).gameId) await quitGame(get(gameStore).gameId!); // Use non-null assertion
+                    if (gameId) {
+                        await quitGame(gameId);
+                    }
                     try {
                         const { gameId, info }: { gameId: string; info: Scenario } = await createGame(place);
                         gameStore.setGame(gameId, info);
@@ -72,7 +91,10 @@
                         console.error("Error creating or resetting game:", error);
                         history = [
                             ...history,
-                            { content: "Error creating or resetting game. Please try again.", author: "bot" },
+                            {
+                                content: "Error creating or resetting game. Please try again.",
+                                author: "bot",
+                            },
                         ];
                     }
                     break;
@@ -147,11 +169,14 @@
                         try {
                             await quitGame(gameId);
                             socket?.close();
-                            gameStore.reset(); // This will use the empty state
-                            updateVisualization(); // Update visuals to clear the grid
+                            gameStore.reset();
+                            updateVisualization();
                             history = [
                                 ...history,
-                                { content: "Game simulation ended and grid reset to initial state.", author: "bot" },
+                                {
+                                    content: "Game simulation ended and grid reset to initial state.",
+                                    author: "bot",
+                                },
                             ];
                         } catch (error) {
                             console.error("Error quitting the game:", error);
@@ -162,12 +187,16 @@
                         }
                     }
                     break;
+                case "clear":
+                case "c":
+                    history = [];
+                    break;
                 default:
                     history = [
                         ...history,
                         {
                             content:
-                                "Command not recognized. Use '|make', '|begin', '|step', '|pause', '|reset', or '|quit'.",
+                                "Command not recognized. Use '|make', '|begin', '|step', '|pause', '|reset', '|quit', or '|clear'.",
                             author: "bot",
                         },
                     ];
@@ -178,6 +207,8 @@
                 { content: "Message not recognized as a command. Commands should start with '|'.", author: "bot" },
             ];
         }
+
+        scrollToBottom();
     }
 
     function handleKeydown(event: KeyboardEvent) {
@@ -189,13 +220,11 @@
     let historyContainer: HTMLDivElement;
 
     async function scrollToBottom() {
-        await tick(); // Wait for DOM update
+        await tick();
         if (historyContainer) {
             historyContainer.scrollTop = historyContainer.scrollHeight;
         }
     }
-
-    $: history, scrollToBottom();
 
     onDestroy(() => {
         if (socket) {
@@ -233,7 +262,6 @@
         overflow-y: auto;
         flex-grow: 1;
         margin-bottom: 1rem;
-        /*// history should always be scrolled down to the latest message--> &*/
         scroll-behavior: smooth;
     }
 
