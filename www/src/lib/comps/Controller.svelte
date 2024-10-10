@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onDestroy, tick } from "svelte";
     import { gameStore } from "$lib/store";
-    import { createGame, resetGame, startGame, pauseGame, stepGame, quitGame, sendMessage } from "$lib/api"; // Import sendMessage
+    import { createGame, resetGame, startGame, pauseGame, stepGame, quitGame, sendMessage } from "$lib/api";
     import { updateVisualization } from "$lib/plots";
     import type { State, Scenario } from "$lib/types";
     import { get } from "svelte/store";
@@ -66,7 +66,6 @@
             const [command, ...args] = message.slice(1).trim().split(" ");
             const place = args.join(" ").trim() || "Abel Cathrines Gade, Copenhagen, Denmark";
 
-            // Existing game command handling logic...
             switch (command.toLowerCase()) {
                 case "make":
                 case "m":
@@ -78,8 +77,6 @@
                         gameStore.setGame(gameId, info);
                         gameStore.setTerrain(info.terrain);
 
-                        // const { state } = await resetGame(gameId);
-                        // gameStore.setState(state);
                         updateVisualization();
                         history = [
                             ...history,
@@ -168,14 +165,23 @@
                 case "q":
                     if (gameId) {
                         try {
+                            // First, clear the game state
+                            const emptyState: State = {
+                                unit_positions: [],
+                                unit_health: [],
+                                unit_types: [],
+                            };
+                            gameStore.setState(emptyState);
+                            updateVisualization();
+
                             await quitGame(gameId);
                             socket?.close();
                             gameStore.reset();
-                            updateVisualization();
+
                             history = [
                                 ...history,
                                 {
-                                    content: "Game simulation ended and grid reset to initial state.",
+                                    content: "Game simulation ended, state cleared and grid reset to initial state.",
                                     author: "bot",
                                 },
                             ];
@@ -190,7 +196,15 @@
                     break;
                 case "clear":
                 case "c":
-                    history = [];
+                    // Clear the game state i.e., setting an empty state
+                    const emptyState: State = {
+                        unit_positions: [],
+                        unit_health: [],
+                        unit_types: [],
+                    };
+                    gameStore.setState(emptyState);
+                    updateVisualization();
+                    history = [...history, { content: "Game state cleared.", author: "bot" }];
                     break;
                 default:
                     history = [
