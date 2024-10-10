@@ -47,3 +47,23 @@ export async function pauseGame(gameId: string): Promise<void> {
     throw new Error(`Failed to pause game: ${result.error}`);
   }
 }
+
+export async function stepGame(gameId: string): Promise<State> {
+  const response = await fetch(`http://localhost:8000/games/${gameId}/step`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to step game: ${response.statusText}`);
+  }
+  const result = await response.json();
+  return result.state;
+}
+
+export async function quitGame(gameId: string): Promise<void> {
+  const response = await fetch(`http://localhost:8000/games/${gameId}/quit`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to quit game: ${response.statusText}`);
+  }
+}

@@ -8,7 +8,9 @@ import asyncio
 import time
 import json
 
+
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -186,3 +188,41 @@ async def pause_game(game_id: str):
         return {"message": "Game paused successfully"}
     else:
         return {"message": "Game is already paused"}
+
+
+@app.post("/games/{game_id}/step")
+async def step_game_endpoint(game_id: str):
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+    game = games[game_id]
+    if game.terminal or not game.state:
+        raise HTTPException(status_code=400, detail="Game is already finished or not initialized")
+
+    # Execute a single step
+    new_state = step_game(game)
+    game.state = new_state
+    state_dict = {
+        "unit_positions": new_state.unit_positions.tolist(),
+        "unit_alive": new_state.unit_alive.tolist(),
+        "unit_teams": new_state.unit_teams.tolist(),
+        "unit_health": new_state.unit_health.tolist(),
+        "unit_types": new_state.unit_types.tolist(),
+        "unit_weapon_cooldowns": new_state.unit_weapon_cooldowns.tolist(),
+        "prev_attack_actions": new_state.prev_attack_actions.tolist(),
+        "time": new_state.time.item(),
+        "terminal": new_state.terminal.item(),
+    }
+    return JSONResponse(content={"state": state_dict}, status_code=200)
+
+
+@app.post("/games/{game_id}/quit")
+async def quit_game(game_id: str):
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+    game = games.pop(game_id, None)
+    if game:
+        game.running = False
+        print(f"Game {game_id} is terminated")
+        return {"message": "Game terminated"}
+    else:
+        return {"message": "Game is not running or already terminated"}
