@@ -34,3 +34,16 @@ export async function startGame(gameId: string): Promise<void> {
     throw new Error(`Failed to start game: ${result.error}`);
   }
 }
+
+export async function pauseGame(gameId: string): Promise<void> {
+  const response = await fetch(`http://localhost:8000/games/${gameId}/pause`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to pause game: ${response.statusText}`);
+  }
+  const result = await response.json();
+  if (result.error) {
+    throw new Error(`Failed to pause game: ${result.error}`);
+  }
+}

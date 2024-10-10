@@ -36,7 +36,7 @@ export function createBackgroundGrid(
   const enter = cells
     .enter()
     .append("rect")
-    .attr("class", "terrain-cell")
+    .attr("class", "terrain-cell ink")
     .attr("x", (d) => scale(d.x) + cellSize / 2)
     .attr("y", (d) => scale(d.y) + cellSize / 2)
     .attr("width", 0)

@@ -174,3 +174,15 @@ async def start_game(game_id: str):
     game = games[game_id]
     game.running = True
     return {"message": "Game started"}
+
+
+@app.post("/games/{game_id}/pause")
+async def pause_game(game_id: str):
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+    game = games[game_id]
+    if game.running:
+        game.running = False
+        return {"message": "Game paused successfully"}
+    else:
+        return {"message": "Game is already paused"}

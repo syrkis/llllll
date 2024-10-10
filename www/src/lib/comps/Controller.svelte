@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onDestroy } from "svelte";
     import { gameStore } from "$lib/store";
-    import { createGame, resetGame, startGame } from "$lib/api";
+    import { createGame, resetGame, startGame, pauseGame } from "$lib/api"; // Import pauseGame
     import { updateVisualization } from "$lib/plots";
     import type { State, Scenario } from "$lib/types";
     import { get } from "svelte/store";
@@ -9,7 +9,7 @@
     let history: { content: string; author: string }[] = [
         {
             content:
-                "In this scenario, you are a C2 commander of the allies. Commands start with '|'. Use '|make' or '|m' followed by a place to create the game. Use '|simulate' or '|s' to start the game.",
+                "In this scenario, you are a C2 commander of the allies. Commands start with '|'. Use '|make' or '|m' followed by a place to create the game. Use '|simulate' or '|s' to start the game. Use '|pause' or '|p' to pause the game.",
             author: "bot",
         },
     ];
@@ -47,49 +47,72 @@
         if (message.startsWith("|")) {
             // Parse command by splitting the message
             const [command, ...args] = message.slice(1).trim().split(" ");
-            const place =
-                args.join(" ").trim() || get(gameStore).gameInfo?.place || "Abel Cathrines Gade, Copenhagen, Denmark";
+            const place = args.join(" ").trim() || "Abel Cathrines Gade, Copenhagen, Denmark";
 
-            // Implement command logic
-            if (["make", "m"].includes(command.toLowerCase())) {
+            if (command.toLowerCase() === "make" || command.toLowerCase() === "m") {
                 try {
                     const { gameId, info }: { gameId: string; info: Scenario } = await createGame(place);
                     gameStore.setGame(gameId, info);
                     gameStore.setTerrain(info.terrain);
 
-                    console.log("Terrain updated:", info.terrain);
+                    // Reset the game to get its initial state
+                    const { state } = await resetGame(gameId);
+                    gameStore.setState(state);
+                    console.log("Initial state received:", state);
+
                     updateVisualization();
                     history = [
                         ...history,
-                        { content: `Game created successfully with place: ${place}`, author: "bot" },
+                        { content: `Game created and reset successfully with place: ${place}`, author: "bot" },
                     ];
                 } catch (error) {
-                    console.error("Error creating game:", error);
-                    history = [...history, { content: "Error creating game. Please try again.", author: "bot" }];
+                    console.error("Error creating or resetting game:", error);
+                    history = [
+                        ...history,
+                        { content: "Error creating or resetting game. Please try again.", author: "bot" },
+                    ];
                 }
-            } else if (["simulate", "s"].includes(command.toLowerCase())) {
+            } else if (command.toLowerCase() === "simulate" || command.toLowerCase() === "s") {
                 const { gameId } = get(gameStore);
                 if (gameId) {
                     try {
-                        await resetGame(gameId);
-                        await startGame(gameId);
-                        setupWebSocket(gameId);
-                        history = [...history, { content: "Game started successfully.", author: "bot" }];
+                        setupWebSocket(gameId); // Prepare for receiving data
+                        history = [
+                            ...history,
+                            { content: "Game state reset successfully; ready to start.", author: "bot" },
+                        ];
                     } catch (error) {
-                        console.error("Error starting game:", error);
-                        history = [...history, { content: "Error starting game. Please try again.", author: "bot" }];
+                        console.error("Error setting up simulation for the game:", error);
+                        history = [
+                            ...history,
+                            { content: "Error setting up game simulation. Please try again.", author: "bot" },
+                        ];
                     }
                 } else {
                     history = [
                         ...history,
-                        { content: "No game has been made. Please create a game with '|make' first.", author: "bot" },
+                        { content: "No game made. Please create a game with '|make' first.", author: "bot" },
                     ];
+                }
+            } else if (command.toLowerCase() === "pause" || command.toLowerCase() === "p") {
+                const { gameId } = get(gameStore);
+                if (gameId) {
+                    try {
+                        await pauseGame(gameId);
+                        history = [...history, { content: "Game paused successfully.", author: "bot" }];
+                    } catch (error) {
+                        console.error("Error pausing the game:", error);
+                        history = [...history, { content: "Error pausing game. Please try again.", author: "bot" }];
+                    }
+                } else {
+                    history = [...history, { content: "No game is running to pause.", author: "bot" }];
                 }
             } else {
                 history = [
                     ...history,
                     {
-                        content: "Command not recognized. Use '|make' to create and '|simulate' to begin the game.",
+                        content:
+                            "Command not recognized. Use '|make' to create, '|simulate' to prepare, and '|pause' to pause the game.",
                         author: "bot",
                     },
                 ];
@@ -116,6 +139,8 @@
         }
     });
 </script>
+
+<!-- HTML and CSS remain as previously provided during your last style update -->
 
 <div id="controller">
     <div class="history" bind:this={historyContainer}>
@@ -146,7 +171,6 @@
         overflow-y: auto;
         flex-grow: 1;
         margin-bottom: 1rem;
-        font-size: 1rem;
     }
 
     .bot {

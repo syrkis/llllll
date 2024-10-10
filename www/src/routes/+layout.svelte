@@ -2,7 +2,7 @@
 
 <style>
     :global(.ink) {
-        fill: none;
+        fill: black;
         stroke: black;
     }
     :global(.ink.enemy) {
@@ -16,6 +16,9 @@
     :global(body) {
         margin: 0;
         overflow: hidden;
+        font-family: "Roboto", sans-serif;
+        font-size: 1.5rem;
+        line-height: 2;
     }
 
     @media (prefers-color-scheme: dark) {
