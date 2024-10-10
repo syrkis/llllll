@@ -20,14 +20,17 @@ export function updateVisualization() {
     terrainDrawn = true;
   }
 
-  const unitData: UnitData[] = currentState.unit_positions.map((position, i) => ({
-    position,
-    team: currentState.unit_teams[i],
-    type: currentState.unit_types[i],
-    health: currentState.unit_health[i],
-    maxHealth: gameInfo.unit_type_info.unit_type_health[currentState.unit_types[i]],
-    attack: currentState.prev_attack_actions[i],
-  }));
+  // Filter unit data to include only living units
+  const unitData: UnitData[] = currentState.unit_positions
+    .map((position, i) => ({
+      position,
+      team: currentState.unit_teams[i],
+      type: currentState.unit_types[i],
+      health: currentState.unit_health[i],
+      maxHealth: gameInfo.unit_type_info.unit_type_health[currentState.unit_types[i]],
+      attack: currentState.prev_attack_actions[i],
+    }))
+    .filter((unit, i) => currentState.unit_alive[i] > 0); // Filter by alive status
 
   updateShapes(svg, unitData, gameInfo.unit_type_info, currentScale);
   updateHealthBars(svg, unitData, currentScale);

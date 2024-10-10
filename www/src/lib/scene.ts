@@ -1,5 +1,4 @@
 import type * as d3 from "d3";
-import type { SVGSelection } from "$lib/types";
 import { easeCubicInOut } from "d3";
 
 interface TerrainCell {
