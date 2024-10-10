@@ -8,7 +8,7 @@ export interface Scenario {
     unit_type_radiuses: number[];
     unit_type_health: number[];
   };
-  terrain: GridData;
+  terrain: number[][]; // Update to use a unified terrain matrix
 }
 
 export interface Observation {
@@ -37,11 +37,15 @@ export interface UnitData {
   attack: number;
 }
 
-export type GridData = {
+// Removed the old separate terrain types
+// Use a single terrain matrix instead
+/* export type GridData = {
   water: boolean[][];
   walls: boolean[][];
   trees: boolean[][];
-};
+}; */
+
+export type GridData = number[][]; // Unified grid data for terrain types
 
 export type SVGSelection = d3.Selection<SVGSVGElement, unknown, null, undefined>;
 

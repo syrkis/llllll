@@ -37,12 +37,10 @@ def game_info_fn(env):
             "unit_type_health": env.unit_type_health,
         },
     )
-    terrain = {
-        "water": env.terrain.water.T.tolist(),
-        "walls": env.terrain.building.T.tolist(),
-        "trees": env.terrain.forest.T.tolist(),
-    }
-    return {"unit_type_info": unit_type_info, "terrain": terrain}
+    water = (1 * env.terrain.water).T
+    trees = (2 * env.terrain.forest).T
+    walls = (3 * env.terrain.building).T
+    return {"unit_type_info": unit_type_info, "terrain": (water + trees + walls).tolist()}
 
 
 # %% Classes

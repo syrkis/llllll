@@ -1,19 +1,15 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
     import { gameStore, scale } from "$lib/store";
-    import { createGame, resetGame } from "$lib/api";
     import { createBackgroundGrid } from "$lib/scene";
-    import { updateVisualization } from "$lib/plots";
+    import { get } from "svelte/store";
     import * as d3 from "d3";
-    import type { Observation, State } from "$lib/types";
 
-    const place = "Dronning Louises Bro, Copenhagen, Denmark";
-
-    let isMounted = false;
     let svgElement: SVGSVGElement;
+    let initialRenderedTerrain: number[][] | null = null;
 
     function initializeScale() {
-        if (isMounted && svgElement) {
+        if (svgElement) {
             const width = svgElement.clientWidth;
             const height = svgElement.clientHeight;
             const newScale = d3
@@ -24,31 +20,18 @@
         }
     }
 
-    async function initializeGame() {
-        try {
-            const { gameId, info } = await createGame(place);
-            gameStore.setGame(gameId, info);
-            console.log("Game created with ID:", gameId);
-            console.log("Game info:", info);
-
-            initializeScale();
-
-            const { obs, state }: { obs: Observation; state: State } = await resetGame(gameId);
-            gameStore.setState(state);
-            console.log("Initial game state:", state);
-            console.log("Initial observation:", obs);
-
-            // Render the initial state
-            updateVisualization();
-        } catch (error) {
-            console.error("Error initializing or resetting game:", error);
+    function drawTerrain() {
+        const { terrain } = get(gameStore);
+        if (terrain && $scale) {
+            const svg = d3.select(svgElement) as d3.Selection<SVGSVGElement, unknown, HTMLElement, any>;
+            createBackgroundGrid(svg, terrain, $scale);
+            initialRenderedTerrain = terrain;
+            console.log("Drawing new terrain");
         }
     }
 
     onMount(() => {
-        isMounted = true;
-        initializeGame();
-        createBackgroundGrid();
+        initializeScale();
         if (typeof window !== "undefined") {
             window.addEventListener("resize", initializeScale);
         }
@@ -60,9 +43,16 @@
         }
     });
 
-    $: if ($gameStore.gameInfo && $scale) {
-        console.log("Game store or scale updated, calling updateVisualization");
-        updateVisualization();
+    // React to changes in the terrain or scale
+    $: {
+        const { terrain } = $gameStore;
+        if (
+            terrain &&
+            $scale &&
+            (!initialRenderedTerrain || JSON.stringify(initialRenderedTerrain) !== JSON.stringify(terrain))
+        ) {
+            drawTerrain();
+        }
     }
 </script>
 

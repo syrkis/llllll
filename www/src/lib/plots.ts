@@ -4,21 +4,21 @@ import { createBackgroundGrid } from "$lib/scene";
 import { gameStore, scale } from "$lib/store";
 import { get } from "svelte/store";
 
+let terrainDrawn = false; // Track whether terrain has been drawn
+
 export function updateVisualization() {
   const { currentState, gameInfo } = get(gameStore);
   const currentScale = get(scale);
-  // console.log("updateVisualization called with:", { currentState, gameInfo, currentScale });
 
   if (!currentState || !gameInfo || !currentScale) {
-    // console.log("Missing data for visualization, returning early");
     return;
   }
 
-  // console.log("Current GameInfo in updateVisualization:", gameInfo);
-  // console.log("Current State in updateVisualization:", currentState);
-
   const svg = d3.select<SVGSVGElement, unknown>("svg");
-  createBackgroundGrid(svg, gameInfo.terrain, currentScale);
+  if (!terrainDrawn) {
+    createBackgroundGrid(svg, gameInfo.terrain, currentScale);
+    terrainDrawn = true;
+  }
 
   const unitData: UnitData[] = currentState.unit_positions.map((position, i) => ({
     position,
@@ -42,16 +42,17 @@ function updateShapes(
 ) {
   const shapes = svg.selectAll<SVGPathElement, UnitData>(".shape").data(unitData, (d, i) => i.toString());
 
-  const duration = 750; // Adjust the duration as needed for smoother transitions
+  // Avoid lengthy transitions that may cause lag
+  const duration = 300;
 
   shapes
     .enter()
     .append("path")
     .attr("class", (d) => `shape ink type-${d.type} ${d.team === 0 ? "ally" : "enemy"}`)
     .merge(shapes)
-    .transition() // Start a transition
-    .duration(duration) // Set the duration for the transition
-    .attr("d", (d, i, nodes) => {
+    .transition()
+    .duration(duration)
+    .attr("d", (d) => {
       const { x, y } = getPosition(d, currentScale);
       const radius = currentScale(unitTypeInfo.unit_type_radiuses[d.type]);
       return createUnitShape(d, x, y, radius);
@@ -67,14 +68,15 @@ function updateHealthBars(
 ) {
   const healthBars = svg.selectAll<SVGRectElement, UnitData>(".health-bar").data(unitData, (d, i) => i.toString());
 
-  const duration = 750; // Use the same duration for consistency
+  const duration = 300;
 
+  // Efficiently handle both enter and update selections
   healthBars
     .enter()
     .append("rect")
     .attr("class", "health-bar ink")
     .merge(healthBars)
-    .transition() // Transition for smooth health bar updates
+    .transition()
     .duration(duration)
     .attr("x", (d) => positionHealthBar(d, currentScale).x)
     .attr("y", (d) => positionHealthBar(d, currentScale).y)
@@ -83,6 +85,7 @@ function updateHealthBars(
 
   healthBars.exit().remove();
 }
+
 function updateAttackStreaks(
   svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
   unitData: UnitData[],
@@ -93,52 +96,30 @@ function updateAttackStreaks(
   const team0Units = unitData.filter((u) => u.team === 0);
   const team1Units = unitData.filter((u) => u.team === 1);
 
-  for (let i = 0; i < unitData.length; i++) {
-    const agent = unitData[i];
+  team0Units.forEach((agent) => {
     if (agent.attack >= 5) {
-      let target: UnitData | undefined;
-      if (agent.team === 0) {
-        const targetIndex = agent.attack - 5;
-        target = team1Units[targetIndex];
-      } else {
-        const targetIndex = team0Units.length - 1 - (agent.attack - 5);
-        target = team0Units[targetIndex];
-      }
-
+      const target = team1Units[agent.attack - 5];
       if (target) {
         const { x1, y1, x2, y2 } = calculateStreakPositions(agent, target, currentScale);
 
-        const line = svg
+        svg
           .append("line")
           .attr("class", "streak ink")
           .attr("stroke-width", 3)
-          .attr("stroke-opacity", 0.8) // Initial higher opacity for better visibility
+          .attr("stroke-opacity", 0.8)
           .attr("x1", x1)
           .attr("y1", y1)
           .attr("x2", x1)
-          .attr("y2", y1);
-
-        // Calculate a longer offset for streak length
-        const streakLength = 30; // Increase the length of the streak
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const length = Math.sqrt(dx * dx + dy * dy);
-        const unitDx = (dx / length) * streakLength;
-        const unitDy = (dy / length) * streakLength;
-
-        // Animate both ends of the line to create a moving streak effect
-        line
+          .attr("y2", y1)
           .transition()
-          .duration(500) // Duration of the animation
-          .attr("x1", x2 - unitDx)
-          .attr("y1", y2 - unitDy)
-          .attr("x2", x2)
-          .attr("y2", y2)
-          .attr("stroke-opacity", 0) // Fade out as it reaches the target
-          .on("end", () => line.remove());
+          .duration(500)
+          .attr("x1", x2)
+          .attr("y1", y2)
+          .attr("stroke-opacity", 0)
+          .remove();
       }
     }
-  }
+  });
 }
 
 function getPosition(d: UnitData, currentScale: d3.ScaleLinear<number, number>) {
@@ -146,12 +127,11 @@ function getPosition(d: UnitData, currentScale: d3.ScaleLinear<number, number>) 
 }
 
 function positionHealthBar(d: UnitData, currentScale: d3.ScaleLinear<number, number>) {
-  const { x, y } = getPosition(d, currentScale);
-  const normalizedHealth = d.health / d.maxHealth;
+  const position = getPosition(d, currentScale);
   return {
-    x: x - 5,
-    y: y - 15,
-    width: normalizedHealth * 10,
+    x: position.x - 5,
+    y: position.y - 15,
+    width: (d.health / d.maxHealth) * 10,
   };
 }
 

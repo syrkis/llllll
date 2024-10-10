@@ -1,98 +1,73 @@
 import type * as d3 from "d3";
-import type { SVGSelection, GridData, CellVisualizationConfig, SimulationConfig } from "$lib/types";
+import type { SVGSelection } from "$lib/types";
+
+interface TerrainCell {
+  value: number;
+  x: number;
+  y: number;
+}
 
 export function createBackgroundGrid(
   svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
-  gridData: { water: boolean[][]; walls: boolean[][]; trees: boolean[][] },
+  terrainMatrix: number[][] | null,
   scale: d3.ScaleLinear<number, number> | null,
 ) {
-  if (!gridData || !scale) return;
-
-  const { walls, water, trees } = gridData;
+  if (!terrainMatrix || !scale) {
+    console.warn("Terrain matrix or scale is undefined");
+    return;
+  }
 
   const cellSize = scale(1) - scale(0);
-  const solidTileSize = cellSize * 0.5;
-  const waterCircleRadius = cellSize * 0.05;
-  const treeSize = cellSize * 0.1;
-  const offset = (cellSize - solidTileSize) / 2; // Centering offset
+  const maxSize = cellSize * 0.9; // Maximum size of the square, slightly smaller than cell size
 
-  // Background cells (all cells)
-  svg
-    .selectAll(".background-cell")
-    .data(
-      walls.flat().map((_, index) => ({
-        x: index % walls[0].length,
-        y: Math.floor(index / walls[0].length),
-      })),
-    )
-    .join("rect")
-    .attr("class", "background-cell")
-    .attr("x", (d) => scale(d.x))
-    .attr("y", (d) => scale(d.y))
-    .attr("width", cellSize)
-    .attr("height", cellSize)
-    .attr("fill", "transparent");
+  const transitionDuration = 1000;
 
-  // Walls (solid tiles)
-  svg
-    .selectAll(".solid-tile")
-    .data(
-      walls
-        .flat()
-        .map((isWall, index) => ({
-          isWall,
-          x: index % walls[0].length,
-          y: Math.floor(index / walls[0].length),
-        }))
-        .filter((d) => d.isWall),
-    )
-    .join("rect")
-    .attr("class", "solid-tile ink")
-    .attr("x", (d) => scale(d.x) + offset)
-    .attr("y", (d) => scale(d.y) + offset)
-    .attr("width", solidTileSize)
-    .attr("height", solidTileSize)
+  const terrainData: TerrainCell[] = terrainMatrix.flat().map((value, index) => ({
+    value,
+    x: index % terrainMatrix[0].length,
+    y: Math.floor(index / terrainMatrix[0].length),
+  }));
+
+  const cells = svg
+    .selectAll<SVGRectElement, TerrainCell>(".terrain-cell")
+    .data(terrainData, (d: TerrainCell) => `${d.x}-${d.y}`);
+
+  // Enter selection
+  const enter = cells
+    .enter()
+    .append("rect")
+    .attr("class", "terrain-cell")
+    .attr("x", (d) => scale(d.x) + cellSize / 2)
+    .attr("y", (d) => scale(d.y) + cellSize / 2)
+    .attr("width", 0)
+    .attr("height", 0)
     .attr("fill", "#fff")
     .attr("stroke", "none");
 
-  // Water cells
-  svg
-    .selectAll(".water-cell")
-    .data(
-      water
-        .flat()
-        .map((isWater, index) => ({
-          isWater,
-          x: index % water[0].length,
-          y: Math.floor(index / water[0].length),
-        }))
-        .filter((d) => d.isWater),
-    )
-    .join("circle")
-    .attr("class", "water-cell ink")
-    .attr("cx", (d) => scale(d.x) + cellSize / 2)
-    .attr("cy", (d) => scale(d.y) + cellSize / 2)
-    .attr("r", waterCircleRadius)
-    .attr("fill", "#fff")
-    .attr("stroke", "none");
+  // Merge enter and update selections
+  enter
+    .merge(cells)
+    .transition()
+    .duration(transitionDuration)
+    .attr("width", (d) => {
+      const squaredValue = Math.pow(d.value, 2) / 20; // (d.value^2) / 20
+      return Math.max(0, squaredValue * maxSize);
+    })
+    .attr("height", (d) => {
+      const squaredValue = Math.pow(d.value, 2) / 20; // (d.value^2) / 20
+      return Math.max(0, squaredValue * maxSize);
+    })
+    .attr("x", (d) => {
+      const squaredValue = Math.pow(d.value, 2) / 20;
+      const size = Math.max(0, squaredValue * maxSize);
+      return scale(d.x) + (cellSize - size) / 2; // Center the square in the cell
+    })
+    .attr("y", (d) => {
+      const squaredValue = Math.pow(d.value, 2) / 20;
+      const size = Math.max(0, squaredValue * maxSize);
+      return scale(d.y) + (cellSize - size) / 2; // Center the square in the cell
+    });
 
-  // Tree cells
-  svg
-    .selectAll(".tree-cell")
-    .data(
-      trees
-        .flat()
-        .map((isTree, index) => ({
-          isTree,
-          x: index % trees[0].length,
-          y: Math.floor(index / trees[0].length),
-        }))
-        .filter((d) => d.isTree),
-    )
-    .join("circle")
-    .attr("class", "tree-cell ink")
-    .attr("cx", (d) => scale(d.x) + cellSize / 2)
-    .attr("cy", (d) => scale(d.y) + cellSize / 2)
-    .attr("r", treeSize)
-    .attr("stroke", "none");
+  // Exit selection
+  cells.exit().remove();
 }
