@@ -1,5 +1,6 @@
 import type * as d3 from "d3";
 import type { SVGSelection } from "$lib/types";
+import { easeCubicInOut } from "d3";
 
 interface TerrainCell {
   value: number;
@@ -40,34 +41,22 @@ export function createBackgroundGrid(
     .attr("x", (d) => scale(d.x) + cellSize / 2)
     .attr("y", (d) => scale(d.y) + cellSize / 2)
     .attr("width", 0)
-    .attr("height", 0)
-    .attr("fill", "#fff")
-    .attr("stroke", "none");
+    .attr("height", 0);
+  // .attr("fill", "#fff")
+  // .attr("stroke", "none");
+  const maxSizeScaleFactor = maxSize / 20;
 
   // Merge enter and update selections
   enter
     .merge(cells)
     .transition()
     .duration(transitionDuration)
-    .attr("width", (d) => {
-      const squaredValue = Math.pow(d.value, 2) / 20; // (d.value^2) / 20
-      return Math.max(0, squaredValue * maxSize);
-    })
-    .attr("height", (d) => {
-      const squaredValue = Math.pow(d.value, 2) / 20; // (d.value^2) / 20
-      return Math.max(0, squaredValue * maxSize);
-    })
-    .attr("x", (d) => {
-      const squaredValue = Math.pow(d.value, 2) / 20;
-      const size = Math.max(0, squaredValue * maxSize);
-      return scale(d.x) + (cellSize - size) / 2; // Center the square in the cell
-    })
-    .attr("y", (d) => {
-      const squaredValue = Math.pow(d.value, 2) / 20;
-      const size = Math.max(0, squaredValue * maxSize);
-      return scale(d.y) + (cellSize - size) / 2; // Center the square in the cell
-    });
-
+    .ease(easeCubicInOut)
+    .attr("x", (d) => scale(d.x) + (cellSize - d.value ** 2 * maxSizeScaleFactor) / 2)
+    .attr("y", (d) => scale(d.y) + (cellSize - d.value ** 2 * maxSizeScaleFactor) / 2)
+    .attr("width", (d) => Math.max(0, d.value ** 2 * maxSizeScaleFactor))
+    .attr("height", (d) => Math.max(0, d.value ** 2 * maxSizeScaleFactor));
+  // .style("opacity", (d) => (d.value ** 2 * maxSizeScaleFactor === 0 ? 0 : 1));
   // Exit selection
   cells.exit().remove();
 }

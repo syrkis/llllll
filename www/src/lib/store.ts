@@ -14,7 +14,7 @@ export interface GameStore {
 const initialTerrain: number[][] = Array.from({ length: 100 }, (_, rowIndex) =>
   Array.from({ length: 100 }, (_, colIndex) => {
     // Every 4th cell (in both row and column) will be 3, others 0
-    return rowIndex % 4 === 0 && colIndex % 5 === 0 ? 3 : 0;
+    return rowIndex % 3 === 0 && colIndex % 3 === 0 ? 3 : 1;
   }),
 );
 
