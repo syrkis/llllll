@@ -83,7 +83,6 @@ function updateHealthBars(
 
   healthBars.exit().remove();
 }
-
 function updateAttackStreaks(
   svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
   unitData: UnitData[],
@@ -108,15 +107,35 @@ function updateAttackStreaks(
 
       if (target) {
         const { x1, y1, x2, y2 } = calculateStreakPositions(agent, target, currentScale);
-        svg
+
+        const line = svg
           .append("line")
           .attr("class", "streak ink")
+          .attr("stroke-width", 3)
+          .attr("stroke-opacity", 0.8) // Initial higher opacity for better visibility
           .attr("x1", x1)
           .attr("y1", y1)
+          .attr("x2", x1)
+          .attr("y2", y1);
+
+        // Calculate a longer offset for streak length
+        const streakLength = 30; // Increase the length of the streak
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const unitDx = (dx / length) * streakLength;
+        const unitDy = (dy / length) * streakLength;
+
+        // Animate both ends of the line to create a moving streak effect
+        line
+          .transition()
+          .duration(500) // Duration of the animation
+          .attr("x1", x2 - unitDx)
+          .attr("y1", y2 - unitDy)
           .attr("x2", x2)
           .attr("y2", y2)
-          .attr("stroke-width", 3)
-          .attr("stroke-opacity", 0.6);
+          .attr("stroke-opacity", 0) // Fade out as it reaches the target
+          .on("end", () => line.remove());
       }
     }
   }

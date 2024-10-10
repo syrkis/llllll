@@ -122,7 +122,8 @@ async def game_loop(game: Game, websocket: WebSocket):
 
 def step_game(game: Game) -> pb.State:
     game.rng, step_key = random.split(game.rng)
-    actions = {a: 1 for a in game.env.agents}
+    act_keys = random.split(step_key, len(game.env.agents))
+    actions = {a: game.env.action_space(a).sample(step_key) for a, step_key in zip(game.env.agents, act_keys)}
     obs, new_state, reward, done, infos = game.env.step(step_key, game.state, actions)
     print(f"Step completed for game {game.id}: time={new_state.time}")
     return new_state
