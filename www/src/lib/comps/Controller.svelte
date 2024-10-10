@@ -49,7 +49,7 @@
         if (message === "start") {
             try {
                 if (!gameId) {
-                    const { gameId: newGameId, info } = await createGame("Marmorkirken, Copenhagen, Denmark");
+                    const { gameId: newGameId, info } = await createGame("Dronning Louises Bro, Copenhagen, Denmark"); // Should be done in Simulation
                     gameId = newGameId;
                     gameStore.setGame(newGameId, info);
                     await resetGame(newGameId);

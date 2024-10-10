@@ -24,23 +24,7 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
 )
 games = {}
-
-
-# %% Functions
-def step(carry, xs, env):
-    (obs, state), (time_step, rng) = carry, xs  # first element is the time step
-    step_key, *act_keys = random.split(rng, 1 + len(env.agents))
-    actions = {a: 2 for a in env.agents}
-    new_obs, new_state, reward, done, infos = env.step(step_key, state, actions)
-    return (new_obs, new_state), (step_key, state, actions)
-
-
-def trajectory_fn(rng, env, state):  # for running one game quickly
-    rng, key = random.split(rng)
-    obs, state = env.reset(key)
-    xs = (jnp.arange(100), random.split(rng, 100))
-    (obs, state), state_seq = lax.scan(partial(step, env), (obs, state), xs)
-    return state_seq
+sleep_time = 0.5
 
 
 def game_info_fn(env):
@@ -133,7 +117,7 @@ async def game_loop(game: Game, websocket: WebSocket):
             print(f"Error in WebSocket for game {game.id}: {str(e)}")
             break
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(sleep_time)
 
 
 def step_game(game: Game) -> pb.State:

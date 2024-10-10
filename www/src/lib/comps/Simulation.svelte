@@ -7,7 +7,7 @@
     import * as d3 from "d3";
     import type { Observation, State } from "$lib/types";
 
-    const place = "Marmorkirken, Copenhagen, Denmark";
+    const place = "Dronning Louises Bro, Copenhagen, Denmark";
 
     let isMounted = false;
     let svgElement: SVGSVGElement;
