@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onDestroy, tick } from "svelte";
     import { gameStore } from "$lib/store";
-    import { createGame, resetGame, startGame, pauseGame, stepGame, quitGame } from "$lib/api";
+    import { createGame, resetGame, startGame, pauseGame, stepGame, quitGame, sendMessage } from "$lib/api"; // Import sendMessage
     import { updateVisualization } from "$lib/plots";
     import type { State, Scenario } from "$lib/types";
     import { get } from "svelte/store";
@@ -66,6 +66,7 @@
             const [command, ...args] = message.slice(1).trim().split(" ");
             const place = args.join(" ").trim() || "Abel Cathrines Gade, Copenhagen, Denmark";
 
+            // Existing game command handling logic...
             switch (command.toLowerCase()) {
                 case "make":
                 case "m":
@@ -77,8 +78,8 @@
                         gameStore.setGame(gameId, info);
                         gameStore.setTerrain(info.terrain);
 
-                        const { state } = await resetGame(gameId);
-                        gameStore.setState(state);
+                        // const { state } = await resetGame(gameId);
+                        // gameStore.setState(state);
                         updateVisualization();
                         history = [
                             ...history,
@@ -202,10 +203,13 @@
                     ];
             }
         } else {
-            history = [
-                ...history,
-                { content: "Message not recognized as a command. Commands should start with '|'.", author: "bot" },
-            ];
+            try {
+                const llmResponse = await sendMessage(message);
+                history = [...history, { content: llmResponse, author: "bot" }];
+            } catch (error) {
+                console.error("Error processing message with LLM:", error);
+                history = [...history, { content: "Error processing message. Please try again.", author: "bot" }];
+            }
         }
 
         scrollToBottom();

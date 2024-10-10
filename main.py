@@ -226,3 +226,29 @@ async def quit_game(game_id: str):
         return {"message": "Game terminated"}
     else:
         return {"message": "Game is not running or already terminated"}
+
+
+#################### LLM API ####################
+async def send_to_llm(message: str) -> str:
+    """
+    Function to interact with the LLM API.
+    Replace this implementation with the actual API call to your LLM.
+    """
+    # Example stub response
+    response = {
+        "input": message,
+        "output": f"Processed message: {message}",
+    }  # Placeholder, replace with actual interaction logic
+    return response["output"]
+
+
+class MessageRequest(BaseModel):
+    message: str
+
+
+@app.post("/process-message")
+async def process_message(request: MessageRequest):
+    message = request.message
+    # Process the message with the LLM
+    processed_message = "blah balah lah"  # await send_to_llm(message)  # Assuming send_to_llm is defined
+    return {"response": processed_message}

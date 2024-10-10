@@ -1,8 +1,10 @@
 // api.ts
 import type { State, Scenario, Observation } from "$lib/types";
 
+const API_BASE_URL = "http://localhost:8000";
+
 export async function createGame(place: string): Promise<{ gameId: string; info: Scenario }> {
-  const response = await fetch(`http://localhost:8000/games/create/${encodeURIComponent(place)}`, {
+  const response = await fetch(`${API_BASE_URL}/games/create/${encodeURIComponent(place)}`, {
     method: "POST",
   });
   if (!response.ok) {
@@ -13,7 +15,7 @@ export async function createGame(place: string): Promise<{ gameId: string; info:
 }
 
 export async function resetGame(gameId: string): Promise<{ obs: Observation; state: State }> {
-  const response = await fetch(`http://localhost:8000/games/${gameId}/reset`, {
+  const response = await fetch(`${API_BASE_URL}/games/${gameId}/reset`, {
     method: "POST",
   });
   if (!response.ok) {
@@ -23,7 +25,7 @@ export async function resetGame(gameId: string): Promise<{ obs: Observation; sta
 }
 
 export async function startGame(gameId: string): Promise<void> {
-  const response = await fetch(`http://localhost:8000/games/${gameId}/start`, {
+  const response = await fetch(`${API_BASE_URL}/games/${gameId}/start`, {
     method: "POST",
   });
   if (!response.ok) {
@@ -36,7 +38,7 @@ export async function startGame(gameId: string): Promise<void> {
 }
 
 export async function pauseGame(gameId: string): Promise<void> {
-  const response = await fetch(`http://localhost:8000/games/${gameId}/pause`, {
+  const response = await fetch(`${API_BASE_URL}/games/${gameId}/pause`, {
     method: "POST",
   });
   if (!response.ok) {
@@ -49,7 +51,7 @@ export async function pauseGame(gameId: string): Promise<void> {
 }
 
 export async function stepGame(gameId: string): Promise<State> {
-  const response = await fetch(`http://localhost:8000/games/${gameId}/step`, {
+  const response = await fetch(`${API_BASE_URL}/games/${gameId}/step`, {
     method: "POST",
   });
   if (!response.ok) {
@@ -60,10 +62,27 @@ export async function stepGame(gameId: string): Promise<State> {
 }
 
 export async function quitGame(gameId: string): Promise<void> {
-  const response = await fetch(`http://localhost:8000/games/${gameId}/quit`, {
+  const response = await fetch(`${API_BASE_URL}/games/${gameId}/quit`, {
     method: "POST",
   });
   if (!response.ok) {
     throw new Error(`Failed to quit game: ${response.statusText}`);
   }
+}
+
+export async function sendMessage(message: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/process-message`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ message }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to process message: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  return result.response;
 }

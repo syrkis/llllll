@@ -75,13 +75,17 @@ function updateHealthBars(
     .enter()
     .append("rect")
     .attr("class", "health-bar ink")
-    .merge(healthBars)
-    .transition()
-    .duration(duration)
+    // Remove the transition from the initial entry, setting positions immediately
     .attr("x", (d) => positionHealthBar(d, currentScale).x)
     .attr("y", (d) => positionHealthBar(d, currentScale).y)
     .attr("width", (d) => positionHealthBar(d, currentScale).width)
-    .attr("height", 2);
+    .attr("height", 2)
+    .merge(healthBars)
+    .transition()
+    .duration(duration) // Apply transitions only to the update selections
+    .attr("x", (d) => positionHealthBar(d, currentScale).x)
+    .attr("y", (d) => positionHealthBar(d, currentScale).y)
+    .attr("width", (d) => positionHealthBar(d, currentScale).width);
 
   healthBars.exit().remove();
 }
@@ -96,7 +100,8 @@ function updateAttackStreaks(
   const team0Units = unitData.filter((u) => u.team === 0);
   const team1Units = unitData.filter((u) => u.team === 1);
 
-  team0Units.forEach((agent) => {
+  for (const agent of team0Units) {
+    // Use for...of instead of forEach
     if (agent.attack >= 5) {
       const target = team1Units[agent.attack - 5];
       if (target) {
@@ -119,7 +124,7 @@ function updateAttackStreaks(
           .remove();
       }
     }
-  });
+  }
 }
 
 function getPosition(d: UnitData, currentScale: d3.ScaleLinear<number, number>) {
