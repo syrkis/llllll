@@ -15,9 +15,16 @@
             const height = svgElement.clientHeight;
             const newScale = d3
                 .scaleLinear()
-                .domain([0, 100]) // TODO: don't hardcode this'
+                .domain([0, 100]) // TODO: don't hardcode this
                 .range([0, Math.min(width, height)]);
             scale.set(newScale);
+
+            // Re-draw the grid without transitions
+            const terrain = get(gameStore).terrain;
+            if (terrain) {
+                const svg = d3.select<SVGSVGElement, unknown>(svgElement as SVGSVGElement);
+                createBackgroundGrid(svg, terrain, newScale, true); // Pass true for resize
+            }
         }
     }
 

@@ -11,6 +11,7 @@ export function createBackgroundGrid(
   svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
   terrainMatrix: number[][] | null,
   scale: d3.ScaleLinear<number, number> | null,
+  isResize = false, // Do not explicitly annotate; TypeScript infers this as boolean from the default value
 ) {
   if (!terrainMatrix || !scale) {
     console.warn("Terrain matrix or scale is undefined");
@@ -21,7 +22,6 @@ export function createBackgroundGrid(
   const maxSize = cellSize * 1; // Maximum size of the square, slightly smaller than cell size
   const minSize = 0.01; // Minimum size of the square for visibility
 
-  const transitionDuration = 1000;
   const maxSizeScaleFactor = maxSize / 20;
 
   const terrainData: TerrainCell[] = terrainMatrix.flat().map((value, index) => ({
@@ -45,21 +45,38 @@ export function createBackgroundGrid(
     .attr("height", 0);
 
   // Merge enter and update selections
-  enter
-    .merge(cells)
-    .transition()
-    .duration(transitionDuration)
-    .ease(easeCubicInOut)
-    .attr("x", (d) => {
-      const size = Math.max(minSize, d.value ** 2 * maxSizeScaleFactor);
-      return scale(d.x) + (cellSize - size) / 2;
-    })
-    .attr("y", (d) => {
-      const size = Math.max(minSize, d.value ** 2 * maxSizeScaleFactor);
-      return scale(d.y) + (cellSize - size) / 2;
-    })
-    .attr("width", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor))
-    .attr("height", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor));
+  const merged = enter.merge(cells);
+
+  if (isResize) {
+    // No transition for resize
+    merged
+      .attr("x", (d) => {
+        const size = Math.max(minSize, d.value ** 2 * maxSizeScaleFactor);
+        return scale(d.x) + (cellSize - size) / 2;
+      })
+      .attr("y", (d) => {
+        const size = Math.max(minSize, d.value ** 2 * maxSizeScaleFactor);
+        return scale(d.y) + (cellSize - size) / 2;
+      })
+      .attr("width", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor))
+      .attr("height", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor));
+  } else {
+    // Apply transition for updates
+    merged
+      .transition()
+      .duration(1000)
+      .ease(easeCubicInOut)
+      .attr("x", (d) => {
+        const size = Math.max(minSize, d.value ** 2 * maxSizeScaleFactor);
+        return scale(d.x) + (cellSize - size) / 2;
+      })
+      .attr("y", (d) => {
+        const size = Math.max(minSize, d.value ** 2 * maxSizeScaleFactor);
+        return scale(d.y) + (cellSize - size) / 2;
+      })
+      .attr("width", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor))
+      .attr("height", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor));
+  }
 
   // Exit selection
   cells.exit().remove();
