@@ -8,13 +8,14 @@
     let svgElement: SVGSVGElement;
     let initialRenderedTerrain: number[][] | null = null;
 
-    function initializeScale() {
-        if (svgElement) {
+    function resizeSVG() {
+        // Ensure that this code only runs in the browser context
+        if (typeof window !== "undefined" && svgElement) {
             const width = svgElement.clientWidth;
             const height = svgElement.clientHeight;
             const newScale = d3
                 .scaleLinear()
-                .domain([0, 100])
+                .domain([0, 100]) // Assuming a domain of 0 to 100
                 .range([0, Math.min(width, height)]);
             scale.set(newScale);
         }
@@ -23,7 +24,7 @@
     function drawTerrain() {
         const { terrain } = get(gameStore);
         if (terrain && $scale) {
-            const svg = d3.select(svgElement) as d3.Selection<SVGSVGElement, unknown, HTMLElement, any>;
+            const svg = d3.select<SVGSVGElement, unknown>(svgElement);
             createBackgroundGrid(svg, terrain, $scale);
             initialRenderedTerrain = terrain;
             console.log("Drawing new terrain");
@@ -31,15 +32,16 @@
     }
 
     onMount(() => {
-        initializeScale();
+        // window is defined only when the component runs in a browser
+        resizeSVG();
         if (typeof window !== "undefined") {
-            window.addEventListener("resize", initializeScale);
+            window.addEventListener("resize", resizeSVG);
         }
     });
 
     onDestroy(() => {
         if (typeof window !== "undefined") {
-            window.removeEventListener("resize", initializeScale);
+            window.removeEventListener("resize", resizeSVG);
         }
     });
 
@@ -51,6 +53,10 @@
             $scale &&
             (!initialRenderedTerrain || JSON.stringify(initialRenderedTerrain) !== JSON.stringify(terrain))
         ) {
+            drawTerrain();
+        }
+        // Update drawing when scale changes
+        else if ($scale) {
             drawTerrain();
         }
     }
