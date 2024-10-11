@@ -15,7 +15,7 @@
             const height = svgElement.clientHeight;
             const newScale = d3
                 .scaleLinear()
-                .domain([0, 100]) // Assuming a domain of 0 to 100
+                .domain([0, 100]) // TODO: don't hardcode this'
                 .range([0, Math.min(width, height)]);
             scale.set(newScale);
         }

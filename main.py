@@ -26,7 +26,7 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
 )
 games = {}
-sleep_time = 0.5
+sleep_time = 0.0
 
 
 def game_info_fn(env):
@@ -123,7 +123,7 @@ async def game_loop(game: Game, websocket: WebSocket):
 def step_game(game: Game) -> pb.State:
     game.rng, step_key = random.split(game.rng)
     act_keys = random.split(step_key, len(game.env.agents))
-    actions = {a: game.env.action_space(a).sample(step_key) for a, step_key in zip(game.env.agents, act_keys)}
+    actions = action_fn(game.env, game.state, act_keys)
     obs, new_state, reward, done, infos = game.env.step(step_key, game.state, actions)
     print(f"Step completed for game {game.id}: time={new_state.time}")
     return new_state
@@ -230,11 +230,6 @@ async def quit_game(game_id: str):
 
 #################### LLM API ####################
 async def send_to_llm(message: str) -> str:
-    """
-    Function to interact with the LLM API.
-    Replace this implementation with the actual API call to your LLM.
-    """
-    # Example stub response
     response = {
         "input": message,
         "output": f"Processed message: {message}",
@@ -252,3 +247,8 @@ async def process_message(request: MessageRequest):
     # Process the message with the LLM
     processed_message = "blah balah lah"  # await send_to_llm(message)  # Assuming send_to_llm is defined
     return {"response": processed_message}
+
+
+def action_fn(env, state, act_keys):
+    actions = {a: env.action_space(a).sample(step_key) for a, step_key in zip(env.agents, act_keys)}
+    return actions

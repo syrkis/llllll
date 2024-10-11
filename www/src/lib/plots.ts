@@ -33,7 +33,7 @@ export function updateVisualization() {
     .filter((unit, i) => currentState.unit_alive[i] > 0); // Filter by alive status
 
   updateShapes(svg, unitData, gameInfo.unit_type_info, currentScale);
-  updateHealthBars(svg, unitData, currentScale);
+  // updateHealthBars(svg, unitData, currentScale);
   updateAttackStreaks(svg, unitData, currentScale);
 }
 
@@ -64,34 +64,34 @@ function updateShapes(
   shapes.exit().remove();
 }
 
-function updateHealthBars(
-  svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
-  unitData: UnitData[],
-  currentScale: d3.ScaleLinear<number, number>,
-) {
-  const healthBars = svg.selectAll<SVGRectElement, UnitData>(".health-bar").data(unitData, (d, i) => i.toString());
+// function updateHealthBars(
+//   svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
+//   unitData: UnitData[],
+//   currentScale: d3.ScaleLinear<number, number>,
+// ) {
+//   const healthBars = svg.selectAll<SVGRectElement, UnitData>(".health-bar").data(unitData, (d, i) => i.toString());
 
-  const duration = 300;
+//   const duration = 300;
 
-  // Efficiently handle both enter and update selections
-  healthBars
-    .enter()
-    .append("rect")
-    .attr("class", "health-bar ink")
-    // Remove the transition from the initial entry, setting positions immediately
-    .attr("x", (d) => positionHealthBar(d, currentScale).x)
-    .attr("y", (d) => positionHealthBar(d, currentScale).y)
-    .attr("width", (d) => positionHealthBar(d, currentScale).width)
-    .attr("height", 2)
-    .merge(healthBars)
-    .transition()
-    .duration(duration) // Apply transitions only to the update selections
-    .attr("x", (d) => positionHealthBar(d, currentScale).x)
-    .attr("y", (d) => positionHealthBar(d, currentScale).y)
-    .attr("width", (d) => positionHealthBar(d, currentScale).width);
+//   // Efficiently handle both enter and update selections
+//   healthBars
+//     .enter()
+//     .append("rect")
+//     .attr("class", "health-bar ink")
+//     // Remove the transition from the initial entry, setting positions immediately
+//     .attr("x", (d) => positionHealthBar(d, currentScale).x)
+//     .attr("y", (d) => positionHealthBar(d, currentScale).y)
+//     .attr("width", (d) => positionHealthBar(d, currentScale).width)
+//     .attr("height", 2)
+//     .merge(healthBars)
+//     .transition()
+//     .duration(duration) // Apply transitions only to the update selections
+//     .attr("x", (d) => positionHealthBar(d, currentScale).x)
+//     .attr("y", (d) => positionHealthBar(d, currentScale).y)
+//     .attr("width", (d) => positionHealthBar(d, currentScale).width);
 
-  healthBars.exit().remove();
-}
+//   healthBars.exit().remove();
+// }
 
 function updateAttackStreaks(
   svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,

@@ -18,7 +18,7 @@ export function createBackgroundGrid(
   }
 
   const cellSize = scale(1) - scale(0);
-  const maxSize = cellSize * 0.9; // Maximum size of the square, slightly smaller than cell size
+  const maxSize = cellSize * 1; // Maximum size of the square, slightly smaller than cell size
   const minSize = 0.01; // Minimum size of the square for visibility
 
   const transitionDuration = 1000;
