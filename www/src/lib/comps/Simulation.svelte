@@ -38,11 +38,30 @@
         }
     }
 
+    // Updated set of symbols
+    const symbols = [
+        "♔",
+        "♕",
+        "♖",
+        "♗",
+        "♘",
+        "♙", // Chess pieces
+        "♥",
+        "♠",
+        "♦",
+        "♣", // Card suits
+        "⚀",
+        "⚁",
+        "⚂",
+        "⚃",
+        "⚄", // Die faces
+    ];
+
     function handleSVGClick(event: MouseEvent) {
         event.preventDefault();
 
         if (event.button === 2) {
-            // Right-click button
+            // Right-click to remove markers
             const [x, y] = d3.pointer(event, svgElement);
             coordinates = coordinates.filter((d) => {
                 const threshold = 10;
@@ -50,11 +69,12 @@
             });
             drawMarkers();
         } else if (event.button === 0) {
-            // Left-click button
+            // Left-click to add markers
             const [x, y] = d3.pointer(event, svgElement);
 
-            const letter = String.fromCharCode(65 + coordinates.length); // 65 is the char code for 'A'
-            coordinates = [...coordinates, { x, y, letter }];
+            // Cycle through symbols instead of letters
+            const symbol = symbols[coordinates.length % symbols.length];
+            coordinates = [...coordinates, { x: x, y: y, letter: symbol }];
             drawMarkers();
 
             // Send coordinates to server
