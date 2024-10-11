@@ -292,9 +292,9 @@
             </div>
         {/each}
         <div class="command-history-header">
-            | Write commands by starting with pipe (i.e. |init [kwargs] to init a game).<br />
+            | Welcome to |||||| — write text without pipe to chat with the bot<br />
+            | Write commands with pipe (i.e. |init [optional kwargs] to init a game)<br />
             | Valid commands: |init, |begin, |step, |pause, |reset, |quit, |clear<br />
-            | Write text without a pipe to chat with the bot.
         </div>
     </div>
 </div>
