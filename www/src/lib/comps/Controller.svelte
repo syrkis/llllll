@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onDestroy, tick } from "svelte";
+    import { onDestroy, onMount, tick } from "svelte";
     import { gameStore } from "$lib/store";
     import { createGame, resetGame, startGame, pauseGame, stepGame, quitGame, sendMessage } from "$lib/api";
     import { updateVisualization } from "$lib/plots";
@@ -14,6 +14,7 @@
         },
     ];
 
+    let commandHistory: { command: string; response: string }[] = [];
     let input: HTMLInputElement;
     let socket: WebSocket | null = null;
 
@@ -45,26 +46,26 @@
 
         const { gameId } = get(gameStore);
 
-        // If the input message is empty, treat it as a step command
         if (!message && gameId) {
             try {
                 const state = await stepGame(gameId);
                 gameStore.setState(state);
                 updateVisualization();
-                // Do not update history
             } catch (error) {
                 console.error("Error stepping the game:", error);
                 history = [...history, { content: "Error stepping the game. Please try again.", author: "bot" }];
             }
+            await refocusInput();
             return;
         }
 
-        // Add user message to history
-        history = [...history, { content: message, author: "user" }];
-
         if (message.startsWith("|")) {
+            commandHistory = [...commandHistory, { command: message, response: "" }];
+
             const [command, ...args] = message.slice(1).trim().split(" ");
             const place = args.join(" ").trim() || "Abel Cathrines Gade, Copenhagen, Denmark";
+
+            let commandResponse = "";
 
             switch (command.toLowerCase()) {
                 case "make":
@@ -78,22 +79,10 @@
                         gameStore.setTerrain(info.terrain);
 
                         updateVisualization();
-                        history = [
-                            ...history,
-                            {
-                                content: `Game created and reset successfully with place: ${place}. Ready to start.`,
-                                author: "bot",
-                            },
-                        ];
+                        commandResponse = "made game";
                     } catch (error) {
                         console.error("Error creating or resetting game:", error);
-                        history = [
-                            ...history,
-                            {
-                                content: "Error creating or resetting game. Please try again.",
-                                author: "bot",
-                            },
-                        ];
+                        commandResponse = "Error creating or resetting game. Please try again.";
                     }
                     break;
                 case "begin":
@@ -102,13 +91,10 @@
                         try {
                             await startGame(gameId);
                             setupWebSocket(gameId);
-                            history = [...history, { content: "Game simulation started.", author: "bot" }];
+                            commandResponse = "begun game";
                         } catch (error) {
                             console.error("Error starting game simulation:", error);
-                            history = [
-                                ...history,
-                                { content: "Error starting game simulation. Please try again.", author: "bot" },
-                            ];
+                            commandResponse = "Error starting game simulation. Please try again.";
                         }
                     }
                     break;
@@ -119,13 +105,10 @@
                             const state = await stepGame(gameId);
                             gameStore.setState(state);
                             updateVisualization();
-                            history = [...history, { content: "Step executed.", author: "bot" }];
+                            commandResponse = "step game";
                         } catch (error) {
                             console.error("Error stepping the game:", error);
-                            history = [
-                                ...history,
-                                { content: "Error stepping the game. Please try again.", author: "bot" },
-                            ];
+                            commandResponse = "Error stepping the game. Please try again.";
                         }
                     }
                     break;
@@ -134,13 +117,10 @@
                     if (gameId) {
                         try {
                             await pauseGame(gameId);
-                            history = [...history, { content: "Game paused successfully.", author: "bot" }];
+                            commandResponse = "paused game";
                         } catch (error) {
                             console.error("Error pausing the game:", error);
-                            history = [
-                                ...history,
-                                { content: "Error pausing the game. Please try again.", author: "bot" },
-                            ];
+                            commandResponse = "Error pausing the game. Please try again.";
                         }
                     }
                     break;
@@ -151,13 +131,10 @@
                             const { state } = await resetGame(gameId);
                             gameStore.setState(state);
                             updateVisualization();
-                            history = [...history, { content: "Game state reset successfully.", author: "bot" }];
+                            commandResponse = "reset state";
                         } catch (error) {
                             console.error("Error resetting the game state:", error);
-                            history = [
-                                ...history,
-                                { content: "Error resetting game state. Please try again.", author: "bot" },
-                            ];
+                            commandResponse = "Error resetting game state. Please try again.";
                         }
                     }
                     break;
@@ -165,58 +142,61 @@
                 case "q":
                     if (gameId) {
                         try {
-                            // First, clear the game state
-                            const emptyState: State = {
-                                unit_positions: [],
-                                unit_health: [],
-                                unit_types: [],
-                            };
-                            gameStore.setState(emptyState);
-                            updateVisualization();
+                            {
+                                const emptyState: State = {
+                                    unit_positions: [],
+                                    unit_health: [],
+                                    unit_types: [],
+                                    unit_alive: [],
+                                    unit_teams: [],
+                                    unit_weapon_cooldowns: [],
+                                    prev_movement_actions: [],
+                                    prev_attack_actions: [],
+                                    time: 0,
+                                    terminal: false,
+                                };
+                                gameStore.setState(emptyState);
+                                updateVisualization();
+                            }
 
                             await quitGame(gameId);
                             socket?.close();
                             gameStore.reset();
 
-                            history = [
-                                ...history,
-                                {
-                                    content: "Game simulation ended, state cleared and grid reset to initial state.",
-                                    author: "bot",
-                                },
-                            ];
+                            commandResponse = "Game simulation ended, state cleared and grid reset to initial state.";
                         } catch (error) {
                             console.error("Error quitting the game:", error);
-                            history = [
-                                ...history,
-                                { content: "Error quitting the game. Please try again.", author: "bot" },
-                            ];
+                            commandResponse = "Error quitting the game. Please try again.";
                         }
                     }
                     break;
                 case "clear":
                 case "c":
-                    // Clear the game state i.e., setting an empty state
-                    const emptyState: State = {
-                        unit_positions: [],
-                        unit_health: [],
-                        unit_types: [],
-                    };
-                    gameStore.setState(emptyState);
-                    updateVisualization();
-                    history = [...history, { content: "Game state cleared.", author: "bot" }];
+                    {
+                        const emptyState: State = {
+                            unit_positions: [],
+                            unit_health: [],
+                            unit_types: [],
+                            unit_alive: [],
+                            unit_teams: [],
+                            unit_weapon_cooldowns: [],
+                            prev_movement_actions: [],
+                            prev_attack_actions: [],
+                            time: 0,
+                            terminal: false,
+                        };
+                        gameStore.setState(emptyState);
+                        updateVisualization();
+                        commandResponse = "clear";
+                    }
                     break;
                 default:
-                    history = [
-                        ...history,
-                        {
-                            content:
-                                "Command not recognized. Use '|make', '|begin', '|step', '|pause', '|reset', '|quit', or '|clear'.",
-                            author: "bot",
-                        },
-                    ];
+                    commandResponse = "Available commands: |make, |begin, |step, |pause, |reset, |quit, |clear";
             }
+
+            commandHistory[commandHistory.length - 1].response = commandResponse;
         } else {
+            history = [...history, { content: message, author: "user" }];
             try {
                 const llmResponse = await sendMessage(message);
                 history = [...history, { content: llmResponse, author: "bot" }];
@@ -226,29 +206,63 @@
             }
         }
 
+        await refocusInput();
         scrollToBottom();
     }
 
-    function handleKeydown(event: KeyboardEvent) {
-        if (event.key === "Enter") {
-            send();
-        }
-    }
-
-    let historyContainer: HTMLDivElement;
-
-    async function scrollToBottom() {
+    async function refocusInput() {
         await tick();
-        if (historyContainer) {
-            historyContainer.scrollTop = historyContainer.scrollHeight;
-        }
+        input?.focus();
     }
+
+    onMount(() => {
+        if (typeof document !== "undefined") {
+            refocusInput();
+            document.addEventListener("click", handleGlobalClick);
+        }
+    });
 
     onDestroy(() => {
         if (socket) {
             socket.close();
         }
+        if (typeof document !== "undefined") {
+            document.removeEventListener("click", handleGlobalClick);
+        }
     });
+
+    function handleGlobalClick(event: MouseEvent) {
+        if (event.target !== input) {
+            refocusInput();
+        }
+    }
+
+    function handleKeydown(event: KeyboardEvent) {
+        if (event.key === "Enter") {
+            send();
+        } else if (event.key === "|") {
+            setTimeout(() => {
+                if (input?.value.charAt(input.value.length - 1) !== " ") {
+                    input.value += " ";
+                }
+            }, 0);
+        }
+    }
+
+    let historyContainer: HTMLDivElement;
+    let commandHistoryContainer: HTMLDivElement;
+
+    async function scrollToBottom() {
+        await tick();
+        if (historyContainer) {
+            historyContainer.scrollTop = historyContainer.scrollHeight; // This keeps the chat history at the bottom
+        }
+        if (commandHistoryContainer) {
+            commandHistoryContainer.scrollTop = 0; // This keeps the command history at the top
+        }
+    }
+
+    $: isCommandInput = input?.value.startsWith("|");
 </script>
 
 <div id="controller">
@@ -263,7 +277,24 @@
     </div>
 
     <div class="input">
-        <input bind:this={input} type="text" placeholder="Type a command..." on:keydown={handleKeydown} />
+        <input
+            bind:this={input}
+            type="text"
+            on:keydown={handleKeydown}
+            style="font-family: {isCommandInput ? 'monospace' : 'Sans-serif'}"
+        />
+    </div>
+
+    <div class="command-history" bind:this={commandHistoryContainer}>
+        {#each commandHistory.slice().reverse() as record}
+            <div class="command">
+                <strong>{record.command}</strong> — {record.response}
+            </div>
+        {/each}
+        <div class="command-history-header">
+            | Write commands by starting with a pipe (i.e. "|begin" to start the game).<br />
+            | Write text without a pipe to chat with the bot.
+        </div>
     </div>
 </div>
 
@@ -283,12 +314,30 @@
         scroll-behavior: smooth;
     }
 
+    .command-history {
+        overflow-y: auto;
+        height: 6rem; /* Adjust height as needed for about two lines */
+        padding: 0.5rem;
+        border-radius: 5px;
+        font-family: monospace;
+        line-height: 1.5;
+    }
+
+    .command-history-header {
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+
     .bot {
         text-align: left;
     }
 
     .user {
         text-align: right;
+    }
+
+    .command {
+        text-align: left;
     }
 
     .input {

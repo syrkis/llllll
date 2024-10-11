@@ -26,7 +26,7 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
 )
 games = {}
-sleep_time = 0.0
+sleep_time = 1.0
 
 
 def game_info_fn(env):
@@ -42,7 +42,7 @@ def game_info_fn(env):
     water = (1 * env.terrain.water).T
     trees = (2 * env.terrain.forest).T
     walls = (3 * env.terrain.building).T
-    return {"unit_type_info": unit_type_info, "terrain": (water + trees + walls).tolist()}
+    return {"unit_type_info": unit_type_info, "terrain": ((water + trees + walls).clip(0, 3)).tolist()}
 
 
 # %% Classes
