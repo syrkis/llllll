@@ -45,18 +45,19 @@
     function handleSVGClick(event: MouseEvent) {
         event.preventDefault();
 
-        if (event.button === 2) {
-            // Right-click to remove markers
-            const [x, y] = d3.pointer(event, svgElement);
-            coordinates = coordinates.filter((d) => {
-                const threshold = 10;
-                return Math.abs(d.x - x) > threshold || Math.abs(d.y - y) > threshold;
-            });
-            drawMarkers();
-        } else if (event.button === 0) {
-            // Left-click to add markers
-            const [x, y] = d3.pointer(event, svgElement);
+        const [x, y] = d3.pointer(event, svgElement);
 
+        // Check if the click is on an existing marker
+        const threshold = 15; // Tolerance for clicking on a marker
+        const markerIndex = coordinates.findIndex(
+            (d) => Math.abs(d.x - x) <= threshold && Math.abs(d.y - y) <= threshold,
+        );
+
+        if (markerIndex !== -1) {
+            // If a marker is found within the click threshold, remove it
+            coordinates.splice(markerIndex, 1);
+        } else {
+            // Add a new marker if the click is not on an existing marker
             let newLetter;
             if (coordinates.length >= maxMarkers) {
                 // If max markers are reached, remove the first and reuse its marker type
@@ -70,9 +71,10 @@
 
             // Add the new marker
             coordinates = [...coordinates, { x, y, letter: newLetter }];
-            drawMarkers();
-            sendCoordinatesToServer();
         }
+
+        drawMarkers();
+        sendCoordinatesToServer();
     }
 
     function drawMarkers() {
@@ -90,7 +92,7 @@
             .attr("y", (d) => d.y)
             .attr("class", "ink")
             .text((d) => d.letter)
-            .style("font-size", "2em");
+            .style("font-size", "3em");
     }
 
     function sendCoordinatesToServer() {
