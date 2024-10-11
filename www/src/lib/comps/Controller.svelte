@@ -9,7 +9,7 @@
     let history: { content: string; author: string }[] = [
         {
             content:
-                "In this scenario, you are a C2 commander of the allies. Commands start with '|'. Use '|make' or '|m' followed by a place to create the game. Use '|begin' or '|b' to start the game. Use '|pause' or '|p' to pause the game, '|s' to step the game, '|reset' or '|r' to reset the state, and '|quit' or '|q' to end the game.",
+                "In this scenario, you are a C2 commander of the allies. Commands start with '|'. Use '|init' or '|i' followed by a place to create the game. Use '|begin' or '|b' to start the game. Use '|pause' or '|p' to pause the game, '|s' to step the game, '|reset' or '|r' to reset the state, and '|quit' or '|q' to end the game.",
             author: "bot",
         },
     ];
@@ -68,8 +68,8 @@
             let commandResponse = "";
 
             switch (command.toLowerCase()) {
-                case "make":
-                case "m":
+                case "init":
+                case "i":
                     if (gameId) {
                         await quitGame(gameId);
                     }
@@ -79,7 +79,7 @@
                         gameStore.setTerrain(info.terrain);
 
                         updateVisualization();
-                        commandResponse = "made game";
+                        commandResponse = "initiated game";
                     } catch (error) {
                         console.error("Error creating or resetting game:", error);
                         commandResponse = "Error creating or resetting game. Please try again.";
@@ -191,7 +191,7 @@
                     }
                     break;
                 default:
-                    commandResponse = "Available commands: |make, |begin, |step, |pause, |reset, |quit, |clear";
+                    commandResponse = "Available commands: |init, |begin, |step, |pause, |reset, |quit, |clear";
             }
 
             commandHistory[commandHistory.length - 1].response = commandResponse;
@@ -292,7 +292,8 @@
             </div>
         {/each}
         <div class="command-history-header">
-            | Write commands by starting with a pipe (i.e. "|begin" to start the game).<br />
+            | Write commands by starting with pipe (i.e. |init [kwargs] to init a game).<br />
+            | Valid commands: |init, |begin, |step, |pause, |reset, |quit, |clear<br />
             | Write text without a pipe to chat with the bot.
         </div>
     </div>
@@ -309,14 +310,15 @@
 
     .history {
         overflow-y: auto;
+        height: 100%;
         flex-grow: 1;
-        margin-bottom: 1rem;
+        /* margin-bottom: 10px; */
         scroll-behavior: smooth;
     }
 
     .command-history {
         overflow-y: auto;
-        height: 6rem; /* Adjust height as needed for about two lines */
+        height: 7rem; /* Adjust height as needed for about two lines */
         padding: 0.5rem;
         border-radius: 5px;
         font-family: monospace;
