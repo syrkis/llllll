@@ -70,6 +70,7 @@ class Game:
         self.terminal = False
         self.state_queue = asyncio.Queue()
         self.rng = random.PRNGKey(0)
+        self.step_fn = jit(env.step)
 
 
 # %% Routes
@@ -124,7 +125,7 @@ def step_game(game: Game) -> pb.State:
     game.rng, step_key = random.split(game.rng)
     act_keys = random.split(step_key, len(game.env.agents))
     actions = action_fn(game.env, game.state, act_keys)
-    obs, new_state, reward, done, infos = game.env.step(step_key, game.state, actions)
+    obs, new_state, reward, done, infos = game.step_fn(step_key, game.state, actions)
     print(f"Step completed for game {game.id}: time={new_state.time}")
     return new_state
 

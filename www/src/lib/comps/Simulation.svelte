@@ -4,26 +4,26 @@
     import { createBackgroundGrid } from "$lib/scene";
     import { get } from "svelte/store";
     import * as d3 from "d3";
+    import { sendMessage } from "$lib/api"; // Import your API function
 
     let svgElement: SVGSVGElement;
     let initialRenderedTerrain: number[][] | null = null;
+    let coordinates: { x: number; y: number; letter: string }[] = [];
 
     function resizeSVG() {
-        // Ensure that this code only runs in the browser context
         if (typeof window !== "undefined" && svgElement) {
             const width = svgElement.clientWidth;
             const height = svgElement.clientHeight;
             const newScale = d3
                 .scaleLinear()
-                .domain([0, 100]) // TODO: don't hardcode this
+                .domain([0, 100])
                 .range([0, Math.min(width, height)]);
             scale.set(newScale);
 
-            // Re-draw the grid without transitions
             const terrain = get(gameStore).terrain;
             if (terrain) {
                 const svg = d3.select<SVGSVGElement, unknown>(svgElement as SVGSVGElement);
-                createBackgroundGrid(svg, terrain, newScale, true); // Pass true for resize
+                createBackgroundGrid(svg, terrain, newScale, true);
             }
         }
     }
@@ -38,21 +38,76 @@
         }
     }
 
+    function handleSVGClick(event: MouseEvent) {
+        event.preventDefault();
+
+        if (event.button === 2) {
+            // Right-click button
+            const [x, y] = d3.pointer(event, svgElement);
+            coordinates = coordinates.filter((d) => {
+                const threshold = 10;
+                return Math.abs(d.x - x) > threshold || Math.abs(d.y - y) > threshold;
+            });
+            drawMarkers();
+        } else if (event.button === 0) {
+            // Left-click button
+            const [x, y] = d3.pointer(event, svgElement);
+
+            const letter = String.fromCharCode(65 + coordinates.length); // 65 is the char code for 'A'
+            coordinates = [...coordinates, { x, y, letter }];
+            drawMarkers();
+
+            // Send coordinates to server
+            sendCoordinatesToServer();
+        }
+    }
+
+    function drawMarkers() {
+        const svg = d3.select(svgElement);
+
+        // Remove existing text elements
+        svg.selectAll("text").remove();
+
+        // Append new text elements
+        svg.selectAll("text")
+            .data(coordinates)
+            .enter()
+            .append("text")
+            .attr("x", (d) => d.x)
+            .attr("y", (d) => d.y)
+            .attr("class", "ink")
+            .text((d) => d.letter)
+            .style("font-size", "2em");
+    }
+
+    function sendCoordinatesToServer() {
+        sendMessage({ coordinates })
+            .then((response) => console.log("Coordinates sent:", response))
+            .catch((error) => console.error("Error sending coordinates:", error));
+    }
+
     onMount(() => {
-        // window is defined only when the component runs in a browser
         resizeSVG();
+
         if (typeof window !== "undefined") {
             window.addEventListener("resize", resizeSVG);
+            svgElement.addEventListener("mousedown", handleSVGClick);
+
+            // Prevent right-click context menu on the entire document
+            document.addEventListener("contextmenu", (event) => event.preventDefault());
         }
     });
 
     onDestroy(() => {
         if (typeof window !== "undefined") {
             window.removeEventListener("resize", resizeSVG);
+            svgElement.removeEventListener("mousedown", handleSVGClick);
+
+            // Remove context menu listener
+            document.removeEventListener("contextmenu", (event) => event.preventDefault());
         }
     });
 
-    // React to changes in the terrain or scale
     $: {
         const { terrain } = $gameStore;
         if (
@@ -61,9 +116,7 @@
             (!initialRenderedTerrain || JSON.stringify(initialRenderedTerrain) !== JSON.stringify(terrain))
         ) {
             drawTerrain();
-        }
-        // Update drawing when scale changes
-        else if ($scale) {
+        } else if ($scale) {
             drawTerrain();
         }
     }
@@ -82,5 +135,8 @@
     svg {
         height: 100%;
         width: 100%;
+    }
+    .ink {
+        font-family: Arial, sans-serif;
     }
 </style>
