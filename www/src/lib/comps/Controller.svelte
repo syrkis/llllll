@@ -12,14 +12,7 @@
         author: string;
         type: "command" | "chat";
         response?: string; // Add response field for commands
-    }[] = [
-        {
-            content:
-                "In this scenario, you are a C2 commander of the allies. Commands start with '|'. Use '|init' or '|i' followed by a place to create the game. Use '|begin' or '|b' to start the game. Use '|pause' or '|p' to pause the game, '|s' to step the game, '|reset' or '|r' to reset the state, and '|quit' or '|q' to end the game.",
-            author: "bot",
-            type: "chat",
-        },
-    ];
+    }[] = [];
 
     let input: HTMLInputElement;
     let socket: WebSocket | null = null;
@@ -339,9 +332,11 @@
             </div>
         {/each}
         <div class="command-history-header">
-            | Welcome to |||||| — write text without pipe to chat with the bot<br />
-            | Write commands with pipe (i.e. |init [optional kwargs] to init a game)<br />
-            | Valid commands: |init, |begin, |step, |pause, |reset, |quit, |clear<br />
+            ||||||| — a language based command / control simulator
+            <br />
+            | Run the commands below with prefix | to control the game
+            <br />
+            | help: |init, |begin, |step, |pause, |reset, |clear, |quit<br />
         </div>
     </div>
 </div>
@@ -364,16 +359,19 @@
 
     .command-history {
         overflow-y: auto;
-        height: 7rem;
+        height: 5.5vw;
         padding: 0.5rem;
         border-radius: 5px;
         font-family: monospace;
-        line-height: 1.5;
+        line-height: 2;
+        /* make fontsize responsive to the width of the controler*/
+        font-size: 0.9vw;
+        white-space: nowrap; /* Prevent text wrapping */
     }
 
     .command-history-header {
+        font-size: inherit;
         font-weight: bold;
-        margin-bottom: 0.5rem;
     }
 
     .bot {

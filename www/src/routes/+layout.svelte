@@ -17,7 +17,7 @@
         margin: 0;
         overflow: hidden;
         font-family: "Roboto", sans-serif;
-        font-size: 1.5rem;
+        font-size: 1rem;
         line-height: 2;
     }
 
