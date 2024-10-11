@@ -19,8 +19,10 @@ export function createBackgroundGrid(
 
   const cellSize = scale(1) - scale(0);
   const maxSize = cellSize * 0.9; // Maximum size of the square, slightly smaller than cell size
+  const minSize = 0.01; // Minimum size of the square for visibility
 
   const transitionDuration = 1000;
+  const maxSizeScaleFactor = maxSize / 20;
 
   const terrainData: TerrainCell[] = terrainMatrix.flat().map((value, index) => ({
     value,
@@ -41,9 +43,6 @@ export function createBackgroundGrid(
     .attr("y", (d) => scale(d.y) + cellSize / 2)
     .attr("width", 0)
     .attr("height", 0);
-  // .attr("fill", "#fff")
-  // .attr("stroke", "none");
-  const maxSizeScaleFactor = maxSize / 20;
 
   // Merge enter and update selections
   enter
@@ -51,11 +50,17 @@ export function createBackgroundGrid(
     .transition()
     .duration(transitionDuration)
     .ease(easeCubicInOut)
-    .attr("x", (d) => scale(d.x) + (cellSize - d.value ** 2 * maxSizeScaleFactor) / 2)
-    .attr("y", (d) => scale(d.y) + (cellSize - d.value ** 2 * maxSizeScaleFactor) / 2)
-    .attr("width", (d) => Math.max(0, d.value ** 2 * maxSizeScaleFactor))
-    .attr("height", (d) => Math.max(0, d.value ** 2 * maxSizeScaleFactor));
-  // .style("opacity", (d) => (d.value ** 2 * maxSizeScaleFactor === 0 ? 0 : 1));
+    .attr("x", (d) => {
+      const size = Math.max(minSize, d.value ** 2 * maxSizeScaleFactor);
+      return scale(d.x) + (cellSize - size) / 2;
+    })
+    .attr("y", (d) => {
+      const size = Math.max(minSize, d.value ** 2 * maxSizeScaleFactor);
+      return scale(d.y) + (cellSize - size) / 2;
+    })
+    .attr("width", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor))
+    .attr("height", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor));
+
   // Exit selection
   cells.exit().remove();
 }
