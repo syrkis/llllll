@@ -4,6 +4,7 @@
     :global(.ink) {
         fill: black;
         stroke: black;
+        color: black;
     }
     :global(.ink.enemy) {
         fill: black;
@@ -25,6 +26,7 @@
         :global(.ink) {
             fill: white;
             stroke: white;
+            color: white;
         }
         :global(.ink.enemy) {
             fill: white;

@@ -48,7 +48,7 @@
         const [x, y] = d3.pointer(event, svgElement);
 
         // Check if the click is on an existing marker
-        const threshold = 15; // Tolerance for clicking on a marker
+        const threshold = 20; // Tolerance for clicking on a marker
         const markerIndex = coordinates.findIndex(
             (d) => Math.abs(d.x - x) <= threshold && Math.abs(d.y - y) <= threshold,
         );
