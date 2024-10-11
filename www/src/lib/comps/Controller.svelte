@@ -6,17 +6,24 @@
     import type { State, Scenario } from "$lib/types";
     import { get } from "svelte/store";
 
-    let history: { content: string; author: string }[] = [
+    // Unified history to track both commands and user chat messages
+    let history: {
+        content: string;
+        author: string;
+        type: "command" | "chat";
+        response?: string; // Add response field for commands
+    }[] = [
         {
             content:
                 "In this scenario, you are a C2 commander of the allies. Commands start with '|'. Use '|init' or '|i' followed by a place to create the game. Use '|begin' or '|b' to start the game. Use '|pause' or '|p' to pause the game, '|s' to step the game, '|reset' or '|r' to reset the state, and '|quit' or '|q' to end the game.",
             author: "bot",
+            type: "chat",
         },
     ];
 
-    let commandHistory: { command: string; response: string }[] = [];
     let input: HTMLInputElement;
     let socket: WebSocket | null = null;
+    let historyIndex = -1; // Track the current position in the entire history
 
     function setupWebSocket(gameId: string) {
         socket = new WebSocket(`ws://localhost:8000/ws/${gameId}`);
@@ -43,6 +50,7 @@
     async function send() {
         const message = input.value.trim();
         input.value = ""; // Clear input field
+        historyIndex = -1; // Reset history index after sending
 
         const { gameId } = get(gameStore);
 
@@ -53,161 +61,179 @@
                 updateVisualization();
             } catch (error) {
                 console.error("Error stepping the game:", error);
-                history = [...history, { content: "Error stepping the game. Please try again.", author: "bot" }];
+                history = [
+                    ...history,
+                    {
+                        content: "Error stepping the game. Please try again.",
+                        author: "bot",
+                        type: "chat",
+                    },
+                ];
             }
             await refocusInput();
             return;
         }
 
         if (message.startsWith("|")) {
-            commandHistory = [...commandHistory, { command: message, response: "" }];
-
-            const [command, ...args] = message.slice(1).trim().split(" ");
-            const place = args.join(" ").trim() || "Abel Cathrines Gade, Copenhagen, Denmark";
-
-            let commandResponse = "";
-
-            switch (command.toLowerCase()) {
-                case "init":
-                case "i":
-                    if (gameId) {
-                        await quitGame(gameId);
-                    }
-                    try {
-                        const { gameId, info }: { gameId: string; info: Scenario } = await createGame(place);
-                        gameStore.setGame(gameId, info);
-                        gameStore.setTerrain(info.terrain);
-
-                        updateVisualization();
-                        commandResponse = "initiated game";
-                    } catch (error) {
-                        console.error("Error creating or resetting game:", error);
-                        commandResponse = "Error creating or resetting game. Please try again.";
-                    }
-                    break;
-                case "begin":
-                case "b":
-                    if (gameId) {
-                        try {
-                            await startGame(gameId);
-                            setupWebSocket(gameId);
-                            commandResponse = "begun game";
-                        } catch (error) {
-                            console.error("Error starting game simulation:", error);
-                            commandResponse = "Error starting game simulation. Please try again.";
-                        }
-                    }
-                    break;
-                case "step":
-                case "s":
-                    if (gameId) {
-                        try {
-                            const state = await stepGame(gameId);
-                            gameStore.setState(state);
-                            updateVisualization();
-                            commandResponse = "step game";
-                        } catch (error) {
-                            console.error("Error stepping the game:", error);
-                            commandResponse = "Error stepping the game. Please try again.";
-                        }
-                    }
-                    break;
-                case "pause":
-                case "p":
-                    if (gameId) {
-                        try {
-                            await pauseGame(gameId);
-                            commandResponse = "paused game";
-                        } catch (error) {
-                            console.error("Error pausing the game:", error);
-                            commandResponse = "Error pausing the game. Please try again.";
-                        }
-                    }
-                    break;
-                case "reset":
-                case "r":
-                    if (gameId) {
-                        try {
-                            const { state } = await resetGame(gameId);
-                            gameStore.setState(state);
-                            updateVisualization();
-                            commandResponse = "reset state";
-                        } catch (error) {
-                            console.error("Error resetting the game state:", error);
-                            commandResponse = "Error resetting game state. Please try again.";
-                        }
-                    }
-                    break;
-                case "quit":
-                case "q":
-                    if (gameId) {
-                        try {
-                            {
-                                const emptyState: State = {
-                                    unit_positions: [],
-                                    unit_health: [],
-                                    unit_types: [],
-                                    unit_alive: [],
-                                    unit_teams: [],
-                                    unit_weapon_cooldowns: [],
-                                    prev_movement_actions: [],
-                                    prev_attack_actions: [],
-                                    time: 0,
-                                    terminal: false,
-                                };
-                                gameStore.setState(emptyState);
-                                updateVisualization();
-                            }
-
-                            await quitGame(gameId);
-                            socket?.close();
-                            gameStore.reset();
-
-                            commandResponse = "Game simulation ended, state cleared and grid reset to initial state.";
-                        } catch (error) {
-                            console.error("Error quitting the game:", error);
-                            commandResponse = "Error quitting the game. Please try again.";
-                        }
-                    }
-                    break;
-                case "clear":
-                case "c":
-                    {
-                        const emptyState: State = {
-                            unit_positions: [],
-                            unit_health: [],
-                            unit_types: [],
-                            unit_alive: [],
-                            unit_teams: [],
-                            unit_weapon_cooldowns: [],
-                            prev_movement_actions: [],
-                            prev_attack_actions: [],
-                            time: 0,
-                            terminal: false,
-                        };
-                        gameStore.setState(emptyState);
-                        updateVisualization();
-                        commandResponse = "clear";
-                    }
-                    break;
-                default:
-                    commandResponse = "Available commands: |init, |begin, |step, |pause, |reset, |quit, |clear";
-            }
-
-            commandHistory[commandHistory.length - 1].response = commandResponse;
+            const commandEntry = { content: message, author: "user", type: "command" };
+            history = [...history, commandEntry];
+            await processCommand(commandEntry, message, gameId);
+            history = [...history]; // Re-assign to trigger reactivity
         } else {
-            history = [...history, { content: message, author: "user" }];
+            // Handle non-command user messages
+            history = [...history, { content: message, author: "user", type: "chat" }];
             try {
                 const llmResponse = await sendMessage(message);
-                history = [...history, { content: llmResponse, author: "bot" }];
+                history = [...history, { content: llmResponse, author: "bot", type: "chat" }];
             } catch (error) {
                 console.error("Error processing message with LLM:", error);
-                history = [...history, { content: "Error processing message. Please try again.", author: "bot" }];
+                history = [
+                    ...history,
+                    { content: "Error processing message. Please try again.", author: "bot", type: "chat" },
+                ];
             }
         }
 
         await refocusInput();
         scrollToBottom();
+    }
+
+    async function processCommand(commandEntry, message, gameId) {
+        const [command, ...args] = message.slice(1).trim().split(" ");
+        const place = args.join(" ").trim() || "Abel Cathrines Gade, Copenhagen, Denmark";
+
+        let commandResponse = "";
+
+        switch (command.toLowerCase()) {
+            case "init":
+            case "i":
+                if (gameId) {
+                    await quitGame(gameId);
+                }
+                try {
+                    const { gameId, info }: { gameId: string; info: Scenario } = await createGame(place);
+                    gameStore.setGame(gameId, info);
+                    gameStore.setTerrain(info.terrain);
+
+                    updateVisualization();
+                    commandResponse = "initiated game";
+                } catch (error) {
+                    console.error("Error creating or resetting game:", error);
+                    commandResponse = "Error creating or resetting game. Please try again.";
+                }
+                break;
+            case "begin":
+            case "b":
+                if (gameId) {
+                    try {
+                        await startGame(gameId);
+                        setupWebSocket(gameId);
+                        commandResponse = "begun game";
+                    } catch (error) {
+                        console.error("Error starting game simulation:", error);
+                        commandResponse = "Error starting game simulation. Please try again.";
+                    }
+                }
+                break;
+            case "step":
+            case "s":
+                if (gameId) {
+                    try {
+                        const state = await stepGame(gameId);
+                        gameStore.setState(state);
+                        updateVisualization();
+                        commandResponse = "step game";
+                    } catch (error) {
+                        console.error("Error stepping the game:", error);
+                        commandResponse = "Error stepping the game. Please try again.";
+                    }
+                }
+                break;
+            case "pause":
+            case "p":
+                if (gameId) {
+                    try {
+                        await pauseGame(gameId);
+                        commandResponse = "paused game";
+                    } catch (error) {
+                        console.error("Error pausing the game:", error);
+                        commandResponse = "Error pausing the game. Please try again.";
+                    }
+                }
+                break;
+            case "reset":
+            case "r":
+                if (gameId) {
+                    try {
+                        const { state } = await resetGame(gameId);
+                        gameStore.setState(state);
+                        updateVisualization();
+                        commandResponse = "reset state";
+                    } catch (error) {
+                        console.error("Error resetting the game state:", error);
+                        commandResponse = "Error resetting game state. Please try again.";
+                    }
+                }
+                break;
+            case "quit":
+            case "q":
+                if (gameId) {
+                    try {
+                        {
+                            const emptyState: State = {
+                                unit_positions: [],
+                                unit_health: [],
+                                unit_types: [],
+                                unit_alive: [],
+                                unit_teams: [],
+                                unit_weapon_cooldowns: [],
+                                prev_movement_actions: [],
+                                prev_attack_actions: [],
+                                time: 0,
+                                terminal: false,
+                            };
+                            gameStore.setState(emptyState);
+                            updateVisualization();
+                        }
+
+                        await quitGame(gameId);
+                        socket?.close();
+                        gameStore.reset();
+
+                        commandResponse = "Game simulation ended, state cleared and grid reset to initial state.";
+                    } catch (error) {
+                        console.error("Error quitting the game:", error);
+                        commandResponse = "Error quitting the game. Please try again.";
+                    }
+                }
+                break;
+            case "clear":
+            case "c":
+                {
+                    const emptyState: State = {
+                        unit_positions: [],
+                        unit_health: [],
+                        unit_types: [],
+                        unit_alive: [],
+                        unit_teams: [],
+                        unit_weapon_cooldowns: [],
+                        prev_movement_actions: [],
+                        prev_attack_actions: [],
+                        time: 0,
+                        terminal: false,
+                    };
+                    gameStore.setState(emptyState);
+                    updateVisualization();
+                    commandResponse = "clear";
+                }
+                break;
+            default:
+                commandResponse = "Available commands: |init, |begin, |step, |pause, |reset, |quit, |clear";
+        }
+
+        // Finally assign response once command is fully processed
+        commandEntry.response = commandResponse;
+        history = [...history]; // Ensure reactivity by reassigning the array
     }
 
     async function refocusInput() {
@@ -246,6 +272,21 @@
                     input.value += " ";
                 }
             }, 0);
+        } else if (event.key === "ArrowUp") {
+            navigateHistory(1);
+        } else if (event.key === "ArrowDown") {
+            navigateHistory(-1);
+        }
+    }
+
+    function navigateHistory(direction: number) {
+        const userEntries = history.filter((entry) => entry.author === "user");
+        if (historyIndex + direction >= 0 && historyIndex + direction < userEntries.length) {
+            historyIndex += direction;
+            input.value = userEntries[userEntries.length - 1 - historyIndex].content;
+        } else if (historyIndex + direction < 0) {
+            historyIndex = -1;
+            input.value = "";
         }
     }
 
@@ -268,10 +309,13 @@
 <div id="controller">
     <div class="history" bind:this={historyContainer}>
         {#each history as message, i (message)}
-            {#if message.author === "bot"}
-                <div class="bot">{message.content}</div>
-            {:else}
-                <div class="user">{message.content}</div>
+            {#if message.type === "chat"}
+                {#if message.author === "bot"}
+                    <div class="bot">{message.content}</div>
+                {:else}
+                    <!-- Ensure user chat is shown too -->
+                    <div class="user">{message.content}</div>
+                {/if}
             {/if}
         {/each}
     </div>
@@ -286,9 +330,12 @@
     </div>
 
     <div class="command-history" bind:this={commandHistoryContainer}>
-        {#each commandHistory.slice().reverse() as record}
+        {#each history.filter((item) => item.type === "command").reverse() as record (record)}
             <div class="command">
-                <strong>{record.command}</strong> — {record.response}
+                <strong>{record.content}</strong>
+                <!-- Only show if response is defined -->
+                {#if record.response}
+                    — {record.response}{/if}
             </div>
         {/each}
         <div class="command-history-header">
@@ -312,13 +359,12 @@
         overflow-y: auto;
         height: 100%;
         flex-grow: 1;
-        /* margin-bottom: 10px; */
         scroll-behavior: smooth;
     }
 
     .command-history {
         overflow-y: auto;
-        height: 7rem; /* Adjust height as needed for about two lines */
+        height: 7rem;
         padding: 0.5rem;
         border-radius: 5px;
         font-family: monospace;
