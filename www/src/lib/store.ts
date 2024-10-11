@@ -36,9 +36,14 @@ function createGameStore() {
     setTerrain: (terrain: GridData) => update((state) => ({ ...state, terrain })),
     setState: (currentState: State) => update((state) => ({ ...state, currentState })),
     reset: () => set({ ...initialGameStore, currentState: emptyState }),
+    setCoordinates: (coordinates: { x: number; y: number; letter: string }[]) =>
+      update((state) => ({ ...state, coordinates })),
   };
 }
 
 export const gameStore = createGameStore();
 
 export const scale = writable<ScaleLinear<number, number> | null>(null);
+
+// Create a separate store for coordinates
+export const coordinatesStore = writable<{ x: number; y: number; letter: string }[]>([]);

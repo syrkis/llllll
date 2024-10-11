@@ -332,11 +332,11 @@
             </div>
         {/each}
         <div class="command-history-header">
-            ||||||| — a language based command / control simulator
+            ||||||| — a language based command and control simulator
             <br />
             | Run the commands below with prefix | to control the game
             <br />
-            | help: |init, |begin, |step, |pause, |reset, |clear, |quit<br />
+            | Commands: |init, |begin, |step, |pause, |reset, |clear, |quit<br />
         </div>
     </div>
 </div>
