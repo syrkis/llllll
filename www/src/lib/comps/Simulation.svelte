@@ -38,24 +38,9 @@
         }
     }
 
-    // Updated set of symbols
-    const symbols = [
-        "♔",
-        "♕",
-        "♖",
-        "♗",
-        "♘",
-        "♙", // Chess pieces
-        "♥",
-        "♠",
-        "♦",
-        "♣", // Card suits
-        "⚀",
-        "⚁",
-        "⚂",
-        "⚃",
-        "⚄", // Die faces
-    ];
+    // Define your chess pieces
+    const chessPieces = ["♔", "♕", "♖", "♗", "♘", "♙"];
+    const maxMarkers = chessPieces.length; // Maximum number of markers
 
     function handleSVGClick(event: MouseEvent) {
         event.preventDefault();
@@ -72,12 +57,20 @@
             // Left-click to add markers
             const [x, y] = d3.pointer(event, svgElement);
 
-            // Cycle through symbols instead of letters
-            const symbol = symbols[coordinates.length % symbols.length];
-            coordinates = [...coordinates, { x: x, y: y, letter: symbol }];
-            drawMarkers();
+            let newLetter;
+            if (coordinates.length >= maxMarkers) {
+                // If max markers are reached, remove the first and reuse its marker type
+                newLetter = coordinates[0].letter;
+                coordinates.shift();
+            } else {
+                // Find the first unused chess piece
+                const usedLetters = new Set(coordinates.map((coord) => coord.letter));
+                newLetter = chessPieces.find((piece) => !usedLetters.has(piece));
+            }
 
-            // Send coordinates to server
+            // Add the new marker
+            coordinates = [...coordinates, { x, y, letter: newLetter }];
+            drawMarkers();
             sendCoordinatesToServer();
         }
     }
