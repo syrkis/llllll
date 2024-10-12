@@ -94,3 +94,11 @@ export interface GameState {
   intervalId: ReturnType<typeof setInterval> | null;
   scale: d3.ScaleLinear<number, number> | null;
 }
+
+export interface ChessPiece {
+  name: string;
+  symbol: string;
+  x: number;
+  y: number;
+  active: boolean;
+}

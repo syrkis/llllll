@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
-    import { gameStore, scale, coordinatesStore } from "$lib/store";
+    import { gameStore, scale, piecesStore } from "$lib/store";
     import { createBackgroundGrid } from "$lib/scene";
     import { get } from "svelte/store";
     import * as d3 from "d3";
@@ -49,7 +49,7 @@
         event.preventDefault();
         const [x, y] = d3.pointer(event, svgElement);
 
-        coordinatesStore.update((pieces) => {
+        piecesStore.update((pieces) => {
             let pieceIndex = pieces.findIndex(
                 (p) => p.active && Math.abs(p.x - x) <= threshold && Math.abs(p.y - y) <= threshold,
             );
@@ -74,7 +74,7 @@
     function handleMouseDown(event: MouseEvent) {
         const [x, y] = d3.pointer(event, svgElement);
 
-        coordinatesStore.update((pieces) => {
+        piecesStore.update((pieces) => {
             dragIndex = pieces.findIndex(
                 (p) => p.active && Math.abs(p.x - x) <= threshold && Math.abs(p.y - y) <= threshold,
             );
@@ -92,7 +92,7 @@
         if (!isDragging) return;
 
         const [x, y] = d3.pointer(event, svgElement);
-        coordinatesStore.update((pieces) => {
+        piecesStore.update((pieces) => {
             if (dragIndex !== -1) {
                 pieces[dragIndex].x += x - dragStartX;
                 pieces[dragIndex].y += y - dragStartY;
@@ -116,7 +116,7 @@
         const svg = d3.select(svgElement);
         svg.selectAll("text").remove();
 
-        coordinatesStore.subscribe((pieces) => {
+        piecesStore.subscribe((pieces) => {
             svg.selectAll("text")
                 .data(pieces.filter((p) => p.active))
                 .enter()
@@ -180,9 +180,5 @@
     svg {
         height: 100%;
         width: 100%;
-    }
-    :global(.piece) {
-        font-family: Arial, sans-serif;
-        transition: transform 0.3s ease-in-out;
     }
 </style>

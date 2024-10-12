@@ -314,7 +314,7 @@
         <div class="command-history-header">
             ||||||| — a language based command and control simulator
             <br />
-            | Run the commands below with prefix | to control the game
+            | Run the commands with prefix | to control the game
             <br />
             | Commands: |init, |begin, |step, |pause, |reset, |quit<br />
         </div>

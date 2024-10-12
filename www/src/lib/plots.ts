@@ -45,14 +45,21 @@ function updateShapes(
 ) {
   const shapes = svg.selectAll<SVGPathElement, UnitData>(".shape").data(unitData, (d, i) => i.toString());
 
-  // Avoid lengthy transitions that may cause lag
-  const duration = 300;
+  // Duration of the entering and exiting transition
+  const duration = 500;
 
-  shapes
+  const enterShapes = shapes
     .enter()
     .append("path")
     .attr("class", (d) => `shape ink type-${d.type} ${d.team === 0 ? "ally" : "enemy"}`)
-    .merge(shapes)
+    .attr("d", (d) => {
+      const { x, y } = getPosition(d, currentScale);
+      // Start with zero radius for entering elements
+      return createUnitShape(d, x, y, 0);
+    });
+
+  // Transition new shapes to their actual size
+  enterShapes
     .transition()
     .duration(duration)
     .attr("d", (d) => {
@@ -61,7 +68,28 @@ function updateShapes(
       return createUnitShape(d, x, y, radius);
     });
 
-  shapes.exit().remove();
+  // Update existing shapes
+  shapes
+    .merge(enterShapes)
+    .transition()
+    .duration(duration)
+    .attr("d", (d) => {
+      const { x, y } = getPosition(d, currentScale);
+      const radius = currentScale(unitTypeInfo.unit_type_radiuses[d.type]);
+      return createUnitShape(d, x, y, radius);
+    });
+
+  // Transition exiting shapes to zero size, then remove
+  shapes
+    .exit()
+    .transition()
+    .duration(duration)
+    .attr("d", (d) => {
+      const { x, y } = getPosition(d, currentScale);
+      // Shrink to zero radius before removal
+      return createUnitShape(d, x, y, 0);
+    })
+    .remove();
 }
 
 // function updateHealthBars(

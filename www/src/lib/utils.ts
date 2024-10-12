@@ -24,6 +24,7 @@ export function handleResize() {
       const newScale = d3.scaleLinear().domain([0, gridSize]).range([0, newVh]);
 
       const currentScale = get(scale);
+      const terrain = get(gameStore).terrain;
       // Compare domain and range instead of the scale itself for accuracy
       if (!currentScale || !areScalesEqual(currentScale, newScale)) {
         scale.set(newScale);

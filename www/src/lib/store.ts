@@ -59,4 +59,4 @@ const initialPieces: ChessPiece[] = [
   { name: "Pawn", symbol: "♙", x: 0, y: 0, active: false },
 ];
 
-export const coordinatesStore = writable<ChessPiece[]>(initialPieces);
+export const piecesStore = writable<ChessPiece[]>(initialPieces);
