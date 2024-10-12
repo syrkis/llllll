@@ -1,14 +1,18 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
-    import { gameStore, scale, coordinatesStore } from "$lib/store"; // Import the new coordinates store
+    import { gameStore, scale, coordinatesStore } from "$lib/store";
     import { createBackgroundGrid } from "$lib/scene";
     import { get } from "svelte/store";
     import * as d3 from "d3";
-    // import { sendMessage } from "$lib/api"; // Ensure this is defined if you uncomment
 
     let svgElement: SVGSVGElement;
     let initialRenderedTerrain: number[][] | null = null;
     let coordinates: { x: number; y: number; letter: string }[] = [];
+
+    let isDragging = false;
+    let dragIndex = -1;
+    let dragStartX = 0;
+    let dragStartY = 0;
 
     function resizeSVG() {
         if (typeof window !== "undefined" && svgElement) {
@@ -22,7 +26,7 @@
 
             const terrain = get(gameStore).terrain;
             if (terrain) {
-                const svg = d3.select<SVGSVGElement, unknown>(svgElement as SVGSVGElement);
+                const svg = d3.select<SVGSVGElement, unknown>(svgElement);
                 createBackgroundGrid(svg, terrain, newScale, true);
             }
         }
@@ -42,6 +46,8 @@
     const maxMarkers = chessPieces.length;
 
     function handleSVGClick(event: MouseEvent) {
+        if (isDragging) return; // Prevent click action if dragging
+
         event.preventDefault();
         const [x, y] = d3.pointer(event, svgElement);
         const threshold = 20;
@@ -51,7 +57,7 @@
         );
 
         if (markerIndex !== -1) {
-            coordinates.splice(markerIndex, 1);
+            coordinates.splice(markerIndex, 1); // Remove if exists
         } else {
             let newLetter = "";
             if (coordinates.length >= maxMarkers) {
@@ -61,13 +67,47 @@
                 const usedLetters = new Set(coordinates.map((coord) => coord.letter));
                 newLetter = chessPieces.find((piece) => !usedLetters.has(piece)) || "";
             }
-
             coordinates = [...coordinates, { x, y, letter: newLetter }];
         }
 
         drawMarkers();
-        coordinatesStore.set(coordinates); // Update the store
-        // sendCoordinatesToServer(); // Ensure sendMessage is imported or defined if used
+        coordinatesStore.set(coordinates);
+    }
+
+    function handleMouseDown(event: MouseEvent) {
+        const [x, y] = d3.pointer(event, svgElement);
+        const threshold = 20;
+
+        dragIndex = coordinates.findIndex((d) => Math.abs(d.x - x) <= threshold && Math.abs(d.y - y) <= threshold);
+
+        if (dragIndex !== -1) {
+            isDragging = true;
+            dragStartX = x;
+            dragStartY = y;
+        }
+    }
+
+    function handleMouseMove(event: MouseEvent) {
+        if (!isDragging) return;
+
+        const [x, y] = d3.pointer(event, svgElement);
+        if (dragIndex !== -1) {
+            // Update the coordinate of the dragged piece
+            coordinates[dragIndex].x += x - dragStartX;
+            coordinates[dragIndex].y += y - dragStartY;
+            dragStartX = x;
+            dragStartY = y;
+
+            drawMarkers();
+        }
+    }
+
+    function handleMouseUp(event: MouseEvent) {
+        if (!isDragging) return;
+
+        isDragging = false;
+        dragIndex = -1;
+        coordinatesStore.set(coordinates); // Update the store when the drag ends
     }
 
     function drawMarkers() {
@@ -90,7 +130,10 @@
 
         if (typeof window !== "undefined") {
             window.addEventListener("resize", resizeSVG);
-            svgElement.addEventListener("mousedown", handleSVGClick);
+            svgElement.addEventListener("mousedown", handleMouseDown);
+            svgElement.addEventListener("mousemove", handleMouseMove);
+            window.addEventListener("mouseup", handleMouseUp);
+            svgElement.addEventListener("click", handleSVGClick);
             document.addEventListener("contextmenu", (event) => event.preventDefault());
         }
     });
@@ -98,7 +141,10 @@
     onDestroy(() => {
         if (typeof window !== "undefined") {
             window.removeEventListener("resize", resizeSVG);
-            svgElement.removeEventListener("mousedown", handleSVGClick);
+            svgElement.removeEventListener("mousedown", handleMouseDown);
+            svgElement.removeEventListener("mousemove", handleMouseMove);
+            window.removeEventListener("mouseup", handleMouseUp);
+            svgElement.removeEventListener("click", handleSVGClick);
             document.removeEventListener("contextmenu", (event) => event.preventDefault());
         }
     });

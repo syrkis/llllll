@@ -200,26 +200,6 @@
                     }
                 }
                 break;
-            case "clear":
-            case "c":
-                {
-                    const emptyState: State = {
-                        unit_positions: [],
-                        unit_health: [],
-                        unit_types: [],
-                        unit_alive: [],
-                        unit_teams: [],
-                        unit_weapon_cooldowns: [],
-                        prev_movement_actions: [],
-                        prev_attack_actions: [],
-                        time: 0,
-                        terminal: false,
-                    };
-                    gameStore.setState(emptyState);
-                    updateVisualization();
-                    commandResponse = "clear";
-                }
-                break;
             default:
                 commandResponse = "Available commands: |init, |begin, |step, |pause, |reset, |quit, |clear";
         }
@@ -336,7 +316,7 @@
             <br />
             | Run the commands below with prefix | to control the game
             <br />
-            | Commands: |init, |begin, |step, |pause, |reset, |clear, |quit<br />
+            | Commands: |init, |begin, |step, |pause, |reset, |quit<br />
         </div>
     </div>
 </div>
