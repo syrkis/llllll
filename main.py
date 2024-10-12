@@ -94,7 +94,7 @@ async def game_loop(game: Game, websocket: WebSocket):
     while game.running and not game.terminal:
         new_state = step_game(game)
         game.state = new_state
-        game.terminal = new_state.terminal.item()  # Convert to Python bool
+        game.terminal = new_state.terminal  # Convert to Python bool
 
         state_dict = {
             "unit_positions": new_state.unit_positions.tolist(),
@@ -104,8 +104,8 @@ async def game_loop(game: Game, websocket: WebSocket):
             "unit_types": new_state.unit_types.tolist(),
             "unit_weapon_cooldowns": new_state.unit_weapon_cooldowns.tolist(),
             "prev_attack_actions": new_state.prev_attack_actions.tolist(),
-            "time": new_state.time.item(),  # Convert to Python int/float
-            "terminal": new_state.terminal.item(),  # Convert to Python bool
+            "time": new_state.time.item(),  # type: ignore
+            "terminal": new_state.terminal.item(),  # type: ignore
         }
 
         try:
@@ -150,8 +150,8 @@ async def game_reset(game_id: str):
         "unit_types": state.unit_types.tolist(),
         "unit_weapon_cooldowns": state.unit_weapon_cooldowns.tolist(),
         "prev_attack_actions": state.prev_attack_actions.tolist(),
-        "time": state.time,
-        "terminal": state.terminal,
+        "time": state.time,  # type: ignore
+        "terminal": state.terminal,  # type: ignore
     }
     return {"obs": obs, "state": state_dict}
 
@@ -210,8 +210,8 @@ async def step_game_endpoint(game_id: str):
         "unit_types": new_state.unit_types.tolist(),
         "unit_weapon_cooldowns": new_state.unit_weapon_cooldowns.tolist(),
         "prev_attack_actions": new_state.prev_attack_actions.tolist(),
-        "time": new_state.time.item(),
-        "terminal": new_state.terminal.item(),
+        "time": new_state.time.item(),  # type: ignore
+        "terminal": new_state.terminal.item(),  # type: ignore
     }
     return JSONResponse(content={"state": state_dict}, status_code=200)
 

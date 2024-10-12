@@ -3,7 +3,7 @@
     import { gameStore, piecesStore } from "$lib/store";
     import { createGame, resetGame, startGame, pauseGame, stepGame, quitGame, sendMessage } from "$lib/api";
     import { updateVisualization } from "$lib/plots";
-    import type { State, Scenario } from "$lib/types";
+    import type { State, Scenario, ChessPiece } from "$lib/types";
     import { get } from "svelte/store";
 
     let history: {
@@ -24,7 +24,7 @@
     let socket: WebSocket | null = null;
     let historyIndex = -1;
 
-    let pieces;
+    let pieces: ChessPiece[] = [];
     piecesStore.subscribe((value) => {
         pieces = value;
     });
