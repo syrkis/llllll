@@ -145,7 +145,7 @@
             .style("font-size", "0em")
             .style("opacity", 0);
 
-        piecesEnter.transition().duration(300).style("font-size", "3em").style("opacity", 1);
+        piecesEnter.transition().duration(500).style("font-size", "3em").style("opacity", 1);
 
         // Update active elements positioning
         pieces
