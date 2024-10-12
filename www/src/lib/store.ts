@@ -8,19 +8,18 @@ export interface GameStore {
   gameId: string | null;
   currentState: State | null;
   gameInfo: Scenario | null;
-  terrain: GridData | null; // Store terrain data
+  terrain: GridData | null;
 }
 
 const initialTerrain: number[][] = Array.from({ length: 100 }, (_, rowIndex) =>
   Array.from({ length: 100 }, (_, colIndex) => {
-    // Every 4th cell (in both row and column) will be 3, others 0
     return rowIndex % 3 === 0 && colIndex % 3 === 0 ? 3 : 0.1;
   }),
 );
 
 const initialGameStore: GameStore = {
   gameId: null,
-  currentState: emptyState, // Use the empty state here as an initial state
+  currentState: emptyState,
   gameInfo: null,
   terrain: initialTerrain,
 };
@@ -36,8 +35,6 @@ function createGameStore() {
     setTerrain: (terrain: GridData) => update((state) => ({ ...state, terrain })),
     setState: (currentState: State) => update((state) => ({ ...state, currentState })),
     reset: () => set({ ...initialGameStore, currentState: emptyState }),
-    setCoordinates: (coordinates: { x: number; y: number; letter: string }[]) =>
-      update((state) => ({ ...state, coordinates })),
   };
 }
 
@@ -45,5 +42,21 @@ export const gameStore = createGameStore();
 
 export const scale = writable<ScaleLinear<number, number> | null>(null);
 
-// Create a separate store for coordinates
-export const coordinatesStore = writable<{ x: number; y: number; letter: string }[]>([]);
+interface ChessPiece {
+  name: string;
+  symbol: string;
+  x: number;
+  y: number;
+  active: boolean;
+}
+
+const initialPieces: ChessPiece[] = [
+  { name: "King", symbol: "♔", x: 0, y: 0, active: false },
+  { name: "Queen", symbol: "♕", x: 0, y: 0, active: false },
+  { name: "Rook", symbol: "♖", x: 0, y: 0, active: false },
+  { name: "Bishop", symbol: "♗", x: 0, y: 0, active: false },
+  { name: "Knight", symbol: "♘", x: 0, y: 0, active: false },
+  { name: "Pawn", symbol: "♙", x: 0, y: 0, active: false },
+];
+
+export const coordinatesStore = writable<ChessPiece[]>(initialPieces);

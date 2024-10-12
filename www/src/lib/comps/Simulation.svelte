@@ -7,7 +7,6 @@
 
     let svgElement: SVGSVGElement;
     let initialRenderedTerrain: number[][] | null = null;
-    let coordinates: { x: number; y: number; letter: string }[] = [];
 
     let isDragging = false;
     let dragIndex = -1;
@@ -42,64 +41,68 @@
         }
     }
 
-    const chessPieces = ["♔", "♕", "♖", "♗", "♘", "♙"];
-    const maxMarkers = chessPieces.length;
+    const threshold = 20; // tolerance for selecting a piece
 
     function handleSVGClick(event: MouseEvent) {
         if (isDragging) return; // Prevent click action if dragging
 
         event.preventDefault();
         const [x, y] = d3.pointer(event, svgElement);
-        const threshold = 20;
 
-        const markerIndex = coordinates.findIndex(
-            (d) => Math.abs(d.x - x) <= threshold && Math.abs(d.y - y) <= threshold,
-        );
-
-        if (markerIndex !== -1) {
-            coordinates.splice(markerIndex, 1); // Remove if exists
-        } else {
-            let newLetter = "";
-            if (coordinates.length >= maxMarkers) {
-                newLetter = coordinates[0].letter;
-                coordinates.shift();
+        coordinatesStore.update((pieces) => {
+            let pieceIndex = pieces.findIndex(
+                (p) => p.active && Math.abs(p.x - x) <= threshold && Math.abs(p.y - y) <= threshold,
+            );
+            if (pieceIndex !== -1) {
+                // Toggle active status
+                pieces[pieceIndex].active = false;
             } else {
-                const usedLetters = new Set(coordinates.map((coord) => coord.letter));
-                newLetter = chessPieces.find((piece) => !usedLetters.has(piece)) || "";
+                pieceIndex = pieces.findIndex((p) => !p.active); // Find the first inactive piece
+                if (pieceIndex !== -1) {
+                    // Place inactive piece
+                    pieces[pieceIndex].x = x;
+                    pieces[pieceIndex].y = y;
+                    pieces[pieceIndex].active = true;
+                }
             }
-            coordinates = [...coordinates, { x, y, letter: newLetter }];
-        }
+            return pieces;
+        });
 
         drawMarkers();
-        coordinatesStore.set(coordinates);
     }
 
     function handleMouseDown(event: MouseEvent) {
         const [x, y] = d3.pointer(event, svgElement);
-        const threshold = 20;
 
-        dragIndex = coordinates.findIndex((d) => Math.abs(d.x - x) <= threshold && Math.abs(d.y - y) <= threshold);
+        coordinatesStore.update((pieces) => {
+            dragIndex = pieces.findIndex(
+                (p) => p.active && Math.abs(p.x - x) <= threshold && Math.abs(p.y - y) <= threshold,
+            );
 
-        if (dragIndex !== -1) {
-            isDragging = true;
-            dragStartX = x;
-            dragStartY = y;
-        }
+            if (dragIndex !== -1) {
+                isDragging = true;
+                dragStartX = x;
+                dragStartY = y;
+            }
+            return pieces;
+        });
     }
 
     function handleMouseMove(event: MouseEvent) {
         if (!isDragging) return;
 
         const [x, y] = d3.pointer(event, svgElement);
-        if (dragIndex !== -1) {
-            // Update the coordinate of the dragged piece
-            coordinates[dragIndex].x += x - dragStartX;
-            coordinates[dragIndex].y += y - dragStartY;
-            dragStartX = x;
-            dragStartY = y;
+        coordinatesStore.update((pieces) => {
+            if (dragIndex !== -1) {
+                pieces[dragIndex].x += x - dragStartX;
+                pieces[dragIndex].y += y - dragStartY;
+                dragStartX = x;
+                dragStartY = y;
+            }
+            return pieces;
+        });
 
-            drawMarkers();
-        }
+        drawMarkers();
     }
 
     function handleMouseUp(event: MouseEvent) {
@@ -107,22 +110,23 @@
 
         isDragging = false;
         dragIndex = -1;
-        coordinatesStore.set(coordinates); // Update the store when the drag ends
     }
 
     function drawMarkers() {
         const svg = d3.select(svgElement);
         svg.selectAll("text").remove();
 
-        svg.selectAll("text")
-            .data(coordinates)
-            .enter()
-            .append("text")
-            .attr("x", (d) => d.x)
-            .attr("y", (d) => d.y)
-            .attr("class", "ink")
-            .text((d) => d.letter)
-            .style("font-size", "3em");
+        coordinatesStore.subscribe((pieces) => {
+            svg.selectAll("text")
+                .data(pieces.filter((p) => p.active))
+                .enter()
+                .append("text")
+                .attr("x", (d) => d.x)
+                .attr("y", (d) => d.y)
+                .attr("class", "piece ink")
+                .text((d) => d.symbol)
+                .style("font-size", "3em");
+        });
     }
 
     onMount(() => {
@@ -177,7 +181,8 @@
         height: 100%;
         width: 100%;
     }
-    .ink {
+    :global(.piece) {
         font-family: Arial, sans-serif;
+        transition: transform 0.3s ease-in-out;
     }
 </style>

@@ -1,6 +1,11 @@
 <slot />
 
 <style>
+    :global(.piece) {
+        user-select: none;
+        font-family: Arial, sans-serif;
+        transition: transform 0.3s ease-in-out;
+    }
     :global(.ink) {
         fill: black;
         stroke: black;
