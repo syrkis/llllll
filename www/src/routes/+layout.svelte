@@ -44,6 +44,7 @@
         :global(body) {
             background-color: black;
             color: white;
+            user-select: none; /* Standard syntax */
         }
     }
     :global(h1, h2) {
