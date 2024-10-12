@@ -13,6 +13,8 @@
     let dragStartX = 0;
     let dragStartY = 0;
 
+    const threshold = 20; // Tolerance for selecting a piece
+
     function resizeSVG() {
         if (typeof window !== "undefined" && svgElement) {
             const width = svgElement.clientWidth;
@@ -37,14 +39,11 @@
             const svg = d3.select<SVGSVGElement, unknown>(svgElement);
             createBackgroundGrid(svg, terrain, $scale);
             initialRenderedTerrain = terrain;
-            console.log("Drawing new terrain");
         }
     }
 
-    const threshold = 20; // tolerance for selecting a piece
-
     function handleSVGClick(event: MouseEvent) {
-        if (isDragging) return; // Prevent click action if dragging
+        if (isDragging) return;
 
         event.preventDefault();
         const [x, y] = d3.pointer(event, svgElement);
@@ -53,13 +52,12 @@
             let pieceIndex = pieces.findIndex(
                 (p) => p.active && Math.abs(p.x - x) <= threshold && Math.abs(p.y - y) <= threshold,
             );
+
             if (pieceIndex !== -1) {
-                // Toggle active status
                 pieces[pieceIndex].active = false;
             } else {
-                pieceIndex = pieces.findIndex((p) => !p.active); // Find the first inactive piece
+                pieceIndex = pieces.findIndex((p) => !p.active);
                 if (pieceIndex !== -1) {
-                    // Place inactive piece
                     pieces[pieceIndex].x = x;
                     pieces[pieceIndex].y = y;
                     pieces[pieceIndex].active = true;
@@ -68,11 +66,12 @@
             return pieces;
         });
 
-        drawMarkers();
+        drawMarkers(); // Force redraw
     }
 
     function handleMouseDown(event: MouseEvent) {
         const [x, y] = d3.pointer(event, svgElement);
+        isDragging = false;
 
         piecesStore.update((pieces) => {
             dragIndex = pieces.findIndex(
@@ -80,7 +79,6 @@
             );
 
             if (dragIndex !== -1) {
-                isDragging = true;
                 dragStartX = x;
                 dragStartY = y;
             }
@@ -89,44 +87,72 @@
     }
 
     function handleMouseMove(event: MouseEvent) {
-        if (!isDragging) return;
+        if (dragIndex === -1) return;
 
         const [x, y] = d3.pointer(event, svgElement);
-        piecesStore.update((pieces) => {
-            if (dragIndex !== -1) {
-                pieces[dragIndex].x += x - dragStartX;
-                pieces[dragIndex].y += y - dragStartY;
-                dragStartX = x;
-                dragStartY = y;
-            }
-            return pieces;
-        });
+        if (Math.abs(x - dragStartX) > 0 || Math.abs(y - dragStartY) > 0) {
+            isDragging = true;
+        }
 
-        drawMarkers();
+        if (isDragging) {
+            piecesStore.update((pieces) => {
+                if (dragIndex !== -1) {
+                    pieces[dragIndex].x += x - dragStartX;
+                    pieces[dragIndex].y += y - dragStartY;
+                    dragStartX = x;
+                    dragStartY = y;
+                }
+                return pieces;
+            });
+
+            drawMarkers(); // Continuously draw markers during drag
+        }
     }
 
     function handleMouseUp(event: MouseEvent) {
-        if (!isDragging) return;
-
-        isDragging = false;
         dragIndex = -1;
     }
 
-    function drawMarkers() {
-        const svg = d3.select(svgElement);
-        svg.selectAll("text").remove();
+    type Piece = {
+        symbol: string;
+        x: number;
+        y: number;
+        active: boolean;
+    };
 
-        piecesStore.subscribe((pieces) => {
-            svg.selectAll("text")
-                .data(pieces.filter((p) => p.active))
-                .enter()
-                .append("text")
-                .attr("x", (d) => d.x)
-                .attr("y", (d) => d.y)
-                .attr("class", "piece ink")
-                .text((d) => d.symbol)
-                .style("font-size", "3em");
-        });
+    // Ensure that drawMarkers runs whenever the piecesStore updates
+    $: drawMarkers();
+
+    function drawMarkers() {
+        const svg = d3.select<SVGSVGElement, unknown>(svgElement);
+
+        const activePieces = $piecesStore.filter((p) => p.active);
+        const pieces = svg.selectAll<SVGTextElement, Piece>("text").data(activePieces, (d) => d.symbol);
+
+        // Handle exiting pieces with transition
+        pieces.exit().transition().duration(300).style("opacity", 0).style("font-size", "0em").remove();
+
+        // Enter active pieces
+        const piecesEnter = pieces
+            .enter()
+            .append("text")
+            .attr("x", (d) => d.x)
+            .attr("y", (d) => d.y)
+            .attr("class", "piece ink")
+            .attr("text-anchor", "middle")
+            .attr("dominant-baseline", "central")
+            .text((d) => d.symbol)
+            .style("font-size", "0em")
+            .style("opacity", 0);
+
+        piecesEnter.transition().duration(300).style("font-size", "3em").style("opacity", 1);
+
+        // Update active elements positioning
+        pieces
+            .attr("x", (d) => d.x)
+            .attr("y", (d) => d.y)
+            .style("font-size", "3em")
+            .style("opacity", 1);
     }
 
     onMount(() => {
@@ -160,8 +186,6 @@
             $scale &&
             (!initialRenderedTerrain || JSON.stringify(initialRenderedTerrain) !== JSON.stringify(terrain))
         ) {
-            drawTerrain();
-        } else if ($scale) {
             drawTerrain();
         }
     }

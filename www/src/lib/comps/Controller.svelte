@@ -1,49 +1,38 @@
 <script lang="ts">
     import { onDestroy, onMount, tick } from "svelte";
-    import { gameStore } from "$lib/store";
+    import { gameStore, piecesStore } from "$lib/store";
     import { createGame, resetGame, startGame, pauseGame, stepGame, quitGame, sendMessage } from "$lib/api";
     import { updateVisualization } from "$lib/plots";
     import type { State, Scenario } from "$lib/types";
     import { get } from "svelte/store";
 
-    // Unified history to track both commands and user chat messages
     let history: {
         content: string;
         author: string;
         type: "command" | "chat";
-        response?: string; // Add response field for commands
-    }[] = [];
+        response?: string;
+    }[] = [
+        {
+            content:
+                "This is a wargame. You interact with it by sending messages to me, your loving AI co-commander, or by typing commands starting with a pipe (e.g., | init Copenhagen, Denmark to run a simulation there). You can also click on the map to place and move pins to reference locations. Unlike traditional war games, you do not assign actions to units. Instead, you talk with me, and I will relay your orders and plans. For example, you could say, 'Send snipers towards the northern bridge and attack on sight, while soldiers sneak through the forest.'",
+            author: "bot",
+            type: "chat",
+        },
+    ];
 
     let input: HTMLInputElement;
     let socket: WebSocket | null = null;
-    let historyIndex = -1; // Track the current position in the entire history
+    let historyIndex = -1;
 
-    function setupWebSocket(gameId: string) {
-        socket = new WebSocket(`ws://localhost:8000/ws/${gameId}`);
-        socket.onopen = () => {
-            console.log("WebSocket connection established");
-        };
-        socket.onmessage = (event) => {
-            try {
-                const state: State = JSON.parse(event.data);
-                gameStore.setState(state);
-                updateVisualization();
-            } catch (error) {
-                console.error("Error parsing WebSocket message:", error);
-            }
-        };
-        socket.onerror = (error) => {
-            console.error("WebSocket error:", error);
-        };
-        socket.onclose = (event) => {
-            console.log("WebSocket closed:", event);
-        };
-    }
+    let pieces;
+    piecesStore.subscribe((value) => {
+        pieces = value;
+    });
 
     async function send() {
         const message = input.value.trim();
-        input.value = ""; // Clear input field
-        historyIndex = -1; // Reset history index after sending
+        input.value = "";
+        historyIndex = -1;
 
         const { gameId } = get(gameStore);
 
@@ -71,9 +60,8 @@
             const commandEntry = { content: message, author: "user", type: "command" };
             history = [...history, commandEntry];
             await processCommand(commandEntry, message, gameId);
-            history = [...history]; // Re-assign to trigger reactivity
+            history = [...history];
         } else {
-            // Handle non-command user messages
             history = [...history, { content: message, author: "user", type: "chat" }];
             try {
                 const llmResponse = await sendMessage(message);
@@ -91,10 +79,9 @@
         scrollToBottom();
     }
 
-    async function processCommand(commandEntry, message, gameId) {
+    async function processCommand(commandEntry: any, message: string, gameId: string) {
         const [command, ...args] = message.slice(1).trim().split(" ");
         const place = args.join(" ").trim() || "Abel Cathrines Gade, Copenhagen, Denmark";
-
         let commandResponse = "";
 
         switch (command.toLowerCase()) {
@@ -172,6 +159,7 @@
             case "q":
                 if (gameId) {
                     try {
+                        // Set pieces to inactive
                         {
                             const emptyState: State = {
                                 unit_positions: [],
@@ -194,19 +182,22 @@
                         gameStore.reset();
 
                         commandResponse = "Game simulation ended, state cleared and grid reset to initial state.";
+                        // piecesStore.update((pieces) => {
+                        //     return pieces.map((piece) => ({ ...piece, active: false }));
+                        // });
                     } catch (error) {
                         console.error("Error quitting the game:", error);
                         commandResponse = "Error quitting the game. Please try again.";
                     }
                 }
                 break;
+
             default:
                 commandResponse = "Available commands: |init, |begin, |step, |pause, |reset, |quit, |clear";
         }
 
-        // Finally assign response once command is fully processed
         commandEntry.response = commandResponse;
-        history = [...history]; // Ensure reactivity by reassigning the array
+        history = [...history];
     }
 
     async function refocusInput() {
@@ -269,10 +260,10 @@
     async function scrollToBottom() {
         await tick();
         if (historyContainer) {
-            historyContainer.scrollTop = historyContainer.scrollHeight; // This keeps the chat history at the bottom
+            historyContainer.scrollTop = historyContainer.scrollHeight;
         }
         if (commandHistoryContainer) {
-            commandHistoryContainer.scrollTop = 0; // This keeps the command history at the top
+            commandHistoryContainer.scrollTop = 0;
         }
     }
 
@@ -286,13 +277,21 @@
                 {#if message.author === "bot"}
                     <div class="bot">{message.content}</div>
                 {:else}
-                    <!-- Ensure user chat is shown too -->
                     <div class="user">{message.content}</div>
                 {/if}
             {/if}
         {/each}
     </div>
 
+    <div class="pieces">
+        <ul>
+            {#each pieces as piece}
+                <li id={piece.name.toLowerCase()} class:inactive={piece.active}>
+                    {piece.symbol}
+                </li>
+            {/each}
+        </ul>
+    </div>
     <div class="input">
         <input
             bind:this={input}
@@ -306,7 +305,6 @@
         {#each history.filter((item) => item.type === "command").reverse() as record (record)}
             <div class="command">
                 <strong>{record.content}</strong>
-                <!-- Only show if response is defined -->
                 {#if record.response}
                     — {record.response}{/if}
             </div>
@@ -330,6 +328,46 @@
         justify-content: space-between;
     }
 
+    li {
+        transition:
+            font-size 0.5s ease,
+            opacity 0.5s ease;
+    }
+
+    .pieces ul {
+        list-style-type: none;
+        display: flex;
+        justify-content: space-between;
+        padding: 0;
+        margin: 0;
+    }
+
+    .pieces li {
+        display: inline-block;
+        font-size: 3rem;
+        opacity: 1;
+        transition:
+            font-size 0.5s ease,
+            opacity 0.5s ease;
+        text-align: center;
+        width: 3rem; /* Maintain consistent space */
+        height: 3rem; /* Consistent height */
+    }
+
+    .pieces li.inactive {
+        font-size: 0rem;
+        opacity: 0;
+        transition:
+            font-size 0.5s ease,
+            opacity 0.5s ease 0.5s; /* Ensure transitions take place sequentially */
+    }
+    .pieces {
+        padding: 0 1rem 3rem 1rem;
+        font-size: 3rem;
+        text-align: center;
+        user-select: none; /* Standard syntax */
+    }
+
     .history {
         overflow-y: auto;
         height: 100%;
@@ -339,14 +377,14 @@
 
     .command-history {
         overflow-y: auto;
-        height: 5.5vw;
+        height: 6vw;
         padding: 0.5rem;
         border-radius: 5px;
         font-family: monospace;
         line-height: 2;
         /* make fontsize responsive to the width of the controler*/
         font-size: 0.9vw;
-        white-space: nowrap; /* Prevent text wrapping */
+        /* white-space: nowrap; */
     }
 
     .command-history-header {

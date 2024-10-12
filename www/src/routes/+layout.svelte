@@ -22,8 +22,8 @@
     :global(body) {
         margin: 0;
         overflow: hidden;
-        font-family: "Roboto", sans-serif;
-        font-size: 1rem;
+        font-family: monospace;
+        font-size: 1.1rem;
         line-height: 2;
     }
 
