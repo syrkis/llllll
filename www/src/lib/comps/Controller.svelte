@@ -29,6 +29,28 @@
         pieces = value;
     });
 
+    function setupWebSocket(gameId: string) {
+        socket = new WebSocket(`ws://localhost:8000/ws/${gameId}`);
+        socket.onopen = () => {
+            console.log("WebSocket connection established");
+        };
+        socket.onmessage = (event) => {
+            try {
+                const state: State = JSON.parse(event.data);
+                gameStore.setState(state);
+                updateVisualization();
+            } catch (error) {
+                console.error("Error parsing WebSocket message:", error);
+            }
+        };
+        socket.onerror = (error) => {
+            console.error("WebSocket error:", error);
+        };
+        socket.onclose = (event) => {
+            console.log("WebSocket closed:", event);
+        };
+    }
+
     async function send() {
         const message = input.value.trim();
         input.value = "";
