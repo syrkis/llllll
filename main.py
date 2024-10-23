@@ -7,6 +7,8 @@ import uuid
 import asyncio
 import time
 import json
+import llllll as ll
+from dataclasses import field
 
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -62,15 +64,24 @@ class GameState(BaseModel):  # for the client
 
 
 class Game:
-    def __init__(self, id, env):
+    def __init__(self, id, env, step, state, obs, rng, env_info, agent_info, assigned_bts, ally_plan, enemy_plan):
         self.id = id
         self.env = env
+        self.step_fn = step
         self.state: Optional[pb.State] = None
+        self.rng = rng
         self.running = False
         self.terminal = False
         self.state_queue = asyncio.Queue()
-        self.rng = random.PRNGKey(0)
-        self.step_fn = jit(env.step)
+        self.obs = obs
+        self.env_info = env_info
+        self.agent_info = agent_info
+        self.assigned_bts = assigned_bts
+        self.ally_plan = ally_plan
+        self.enemy_plan = enemy_plan
+        self.direction_maps: Dict = field(default_factory=Dict)
+
+        # self.step_fn = jit(env.step)
 
 
 # %% Routes
@@ -79,20 +90,48 @@ async def game_create(place):
     game_id = str(uuid.uuid4())
     if game_id in games:
         return game_id
-    scenario = pb.env.scenario_fn(place, 100)
-    env = pb.Environment(scenario=scenario)
-    game = Game(game_id, env)
-    obs, state = game.env.reset(game.rng)
-    game.state = state
+    bts_txt = ["A (move north)", "A (move east)"]
+    bt_fns = ll.act.bts_fn(bts_txt)
+    env, env_info, agent_info = ll.env.create_env(place)
+    assigned_bts = {a: int(a.startswith("e")) for a in env.agents}
+
+    enemy_plan = ll.llm.parse_plan(
+        ll.act.default_plan,
+        env.num_allies,
+        env.num_enemies,
+        3,
+        ["position", "eliminate"],
+        ll.bts.LLM_BTs,
+        for_ally=False,
+    )
+
+    ally_plan = ll.llm.parse_plan(
+        ll.act.default_plan,
+        env.num_allies,
+        env.num_enemies,
+        2,
+        ["position", "eliminate"],
+        ll.bts.LLM_BTs,
+    )
+
+    # distance_map = ll.act.compute_direction_map(game, target)
+
+    step = ll.act.step_fn(env, env_info, agent_info, bt_fns, assigned_bts)
+    rng, key = random.split(random.PRNGKey(0))
+    obs, state = env.reset(key)
+    game = Game(game_id, env, step, state, obs, rng, env_info, agent_info, assigned_bts, ally_plan, enemy_plan)
+    ll.act.initialize_plan(game)
+
     games[game_id] = game
-    print(f"Game {game_id} created")
     return game_id, game_info_fn(env)
 
 
 async def game_loop(game: Game, websocket: WebSocket):
     print(f"Starting game loop for game {game.id}")
     while game.running and not game.terminal:
-        new_state = step_game(game)
+        # new_state = step_game(game)
+        game.rng, key = random.split(game.rng)
+        new_obs, new_state, actions = game.step_fn(game.obs, game.state, key)
         game.state = new_state
         game.terminal = new_state.terminal  # Convert to Python bool
 
@@ -121,13 +160,13 @@ async def game_loop(game: Game, websocket: WebSocket):
         await asyncio.sleep(sleep_time)
 
 
-def step_game(game: Game) -> pb.State:
-    game.rng, step_key = random.split(game.rng)
-    act_keys = random.split(step_key, len(game.env.agents))
-    actions = action_fn(game.env, game.state, act_keys)
-    obs, new_state, reward, done, infos = game.step_fn(step_key, game.state, actions)
-    print(f"Step completed for game {game.id}: time={new_state.time}")
-    return new_state
+# def step_game(game: Game) -> pb.State:
+#     game.rng, step_key = random.split(game.rng)
+#     act_keys = random.split(step_key, len(game.env.agents))
+#     actions = action_fn(game.env, game.state, act_keys)
+#     obs, new_state, reward, done, infos = game.step_fn(step_key, game.state, actions)
+#     print(f"Step completed for game {game.id}: time={new_state.time}")
+#     return new_state
 
 
 @app.post("/games/{game_id}/reset")
@@ -250,6 +289,6 @@ async def process_message(request: MessageRequest):
     return {"response": processed_message}
 
 
-def action_fn(env, state, act_keys):
-    actions = {a: env.action_space(a).sample(step_key) for a, step_key in zip(env.agents, act_keys)}
+def action_fn(env, bts, state, act_keys):
+    actions = {agent: env.action_space(agent).sample(step_key) for agent, step_key in zip(env.agents, act_keys)}
     return actions

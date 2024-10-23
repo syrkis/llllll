@@ -1,3 +1,6 @@
 [submodule "parabellum"]
 	path = parabellum
 	url = git@github.com:syrkis/parabellum.git
+[submodule "btc2sim"]
+	path = btc2sim
+	url = git@github.com:syrkis/btc2sim.git
