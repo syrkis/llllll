@@ -64,7 +64,7 @@ class GameState(BaseModel):  # for the client
 
 
 class Game:
-    def __init__(self, id, env, step, state, obs, rng, env_info, agent_info, assigned_bts, ally_plan, enemy_plan):
+    def __init__(self, id, env, step, state, obs, rng, env_info, agent_info, ally_plan, enemy_plan, bt_name_dict):
         self.id = id
         self.env = env
         self.step_fn = step
@@ -76,10 +76,11 @@ class Game:
         self.obs = obs
         self.env_info = env_info
         self.agent_info = agent_info
-        self.assigned_bts = assigned_bts
         self.ally_plan = ally_plan
         self.enemy_plan = enemy_plan
-        self.direction_maps: Dict = field(default_factory=Dict)
+        self.direction_maps: Dict = {}
+        self.assigned_bts = {a: None for a in env.agents}
+        self.bt_name_dict = bt_name_dict
 
         # self.step_fn = jit(env.step)
 
@@ -93,35 +94,36 @@ async def game_create(place):
     bts_txt = ["A (move north)", "A (move east)"]
     bt_fns = ll.act.bts_fn(bts_txt)
     env, env_info, agent_info = ll.env.create_env(place)
-    assigned_bts = {a: int(a.startswith("e")) for a in env.agents}
+    # assigned_bts = {a: int(a.startswith("e")) for a in env.agents}
 
-    enemy_plan = ll.llm.parse_plan(
-        ll.act.default_plan,
+    bts_bank, bts_bank_variant_subsets = ll.bts.bt_bank_jit()
+    bt_name_dict = {key: i for i, key in enumerate(bts_bank.keys())}
+    enemy_plan = ll.plan.parse_plan(
+        ll.plan.default_plan,
         env.num_allies,
         env.num_enemies,
         3,
         ["position", "eliminate"],
         ll.bts.LLM_BTs,
+        bts_bank_variant_subsets,
         for_ally=False,
     )
 
-    ally_plan = ll.llm.parse_plan(
-        ll.act.default_plan,
+    ally_plan = ll.plan.parse_plan(
+        ll.plan.default_plan,
         env.num_allies,
         env.num_enemies,
         2,
         ["position", "eliminate"],
         ll.bts.LLM_BTs,
+        bts_bank_variant_subsets,
     )
 
-    # distance_map = ll.act.compute_direction_map(game, target)
-
-    step = ll.act.step_fn(env, env_info, agent_info, bt_fns, assigned_bts)
+    step = ll.act.step_fn(env, env_info, agent_info, bt_fns)
     rng, key = random.split(random.PRNGKey(0))
     obs, state = env.reset(key)
-    game = Game(game_id, env, step, state, obs, rng, env_info, agent_info, assigned_bts, ally_plan, enemy_plan)
-    ll.act.initialize_plan(game)
-
+    game = Game(game_id, env, step, state, obs, rng, env_info, agent_info, ally_plan, enemy_plan, bt_name_dict)
+    ll.plan.initialize_plan(game)  # object hidden state stuff.
     games[game_id] = game
     return game_id, game_info_fn(env)
 
@@ -130,8 +132,9 @@ async def game_loop(game: Game, websocket: WebSocket):
     print(f"Starting game loop for game {game.id}")
     while game.running and not game.terminal:
         # new_state = step_game(game)
+        ll.plan.apply_plan(game)
         game.rng, key = random.split(game.rng)
-        new_obs, new_state, actions = game.step_fn(game.obs, game.state, key)
+        new_obs, new_state, actions = game.step_fn(game.obs, game.state, key, game.assigned_bts)
         game.state = new_state
         game.terminal = new_state.terminal  # Convert to Python bool
 
@@ -230,29 +233,29 @@ async def pause_game(game_id: str):
         return {"message": "Game is already paused"}
 
 
-@app.post("/games/{game_id}/step")
-async def step_game_endpoint(game_id: str):
-    if game_id not in games:
-        raise HTTPException(status_code=404, detail="Game not found")
-    game = games[game_id]
-    if game.terminal or not game.state:
-        raise HTTPException(status_code=400, detail="Game is already finished or not initialized")
+# @app.post("/games/{game_id}/step")
+# async def step_game_endpoint(game_id: str):
+#     if game_id not in games:
+#         raise HTTPException(status_code=404, detail="Game not found")
+#     game = games[game_id]
+#     if game.terminal or not game.state:
+#         raise HTTPException(status_code=400, detail="Game is already finished or not initialized")
 
-    # Execute a single step
-    new_state = step_game(game)
-    game.state = new_state
-    state_dict = {
-        "unit_positions": new_state.unit_positions.tolist(),
-        "unit_alive": new_state.unit_alive.tolist(),
-        "unit_teams": new_state.unit_teams.tolist(),
-        "unit_health": new_state.unit_health.tolist(),
-        "unit_types": new_state.unit_types.tolist(),
-        "unit_weapon_cooldowns": new_state.unit_weapon_cooldowns.tolist(),
-        "prev_attack_actions": new_state.prev_attack_actions.tolist(),
-        "time": new_state.time.item(),  # type: ignore
-        "terminal": new_state.terminal.item(),  # type: ignore
-    }
-    return JSONResponse(content={"state": state_dict}, status_code=200)
+#     # Execute a single step
+#     # new_state = step_game(game)
+#     game.state = new_state
+#     state_dict = {
+#         "unit_positions": new_state.unit_positions.tolist(),
+#         "unit_alive": new_state.unit_alive.tolist(),
+#         "unit_teams": new_state.unit_teams.tolist(),
+#         "unit_health": new_state.unit_health.tolist(),
+#         "unit_types": new_state.unit_types.tolist(),
+#         "unit_weapon_cooldowns": new_state.unit_weapon_cooldowns.tolist(),
+#         "prev_attack_actions": new_state.prev_attack_actions.tolist(),
+#         "time": new_state.time.item(),  # type: ignore
+#         "terminal": new_state.terminal.item(),  # type: ignore
+#     }
+#     return JSONResponse(content={"state": state_dict}, status_code=200)
 
 
 @app.post("/games/{game_id}/quit")

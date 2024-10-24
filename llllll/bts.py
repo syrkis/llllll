@@ -1,9 +1,12 @@
 # # Imports
 
+from btc2sim import btc2sim
 from itertools import chain, combinations
+from functools import lru_cache
 
 
 # # Functions
+
 
 # ## Target variants
 
@@ -95,28 +98,29 @@ bt_attack_and_fallback = """
         """
 # -
 
-unit_types = ["soldier", "sniper", "swat", "turret", "civilian"]
-
 
 handcrafted_bts = {
     "Stand": {"bt": "A (stand)", "description": "The units do nothing."},
     "Follow_map": {
-        "bt": "A (follow_map)",
+        "bt": "A (follow_map toward)",
         "description": "The units follow their direction map (stand if not direction map)",
     },
     "Attack": {
-        "bt": set_default(bt_attack_and_wait, "A (follow_map)"),
+        "bt": set_default(bt_attack_and_wait, "A (follow_map toward)"),
         "description": "The units attack all the enemies in range.",
     },
     "Attack_in_close_range": {
-        "bt": set_default(bt_attack_and_chase, "A (follow_map)"),
+        "bt": set_default(bt_attack_and_chase, "A (follow_map toward)"),
         "description": "The units wait for their opponent, attack them and then move toward them.",
     },
     "Attack_in_long_range": {
-        "bt": set_default(bt_attack_and_stay_out_of_range, "A (follow_map)"),
+        "bt": set_default(bt_attack_and_stay_out_of_range, "A (follow_map toward)"),
         "description": "Attack while keeping out of reach of the enemy.",
     },
-    "Flee": {"bt": set_default(bt_flee, "A (follow_map)"), "description": "Move away from closest foe in sight."},
+    "Flee": {
+        "bt": set_default(bt_flee, "A (follow_map toward)"),
+        "description": "Move away from closest foe in sight.",
+    },
     "Follow_allies": {
         "bt": "F (A (move toward closest foe) :: A (stand))",
         "description": "Move toward the closest foe in sight. (For the NPC civilians)",
@@ -126,8 +130,10 @@ handcrafted_bts = {
         "bt": bt_attack_and_chase,
         "description": "The units attack all the enemies in range without moving.",
     },
-    "LR_out_of_forest": {"bt": f"F (S (C (is_in_forest) :: A (follow_map)) :: {bt_attack_and_stay_out_of_range})"},
-    "SR_out_of_forest": {"bt": f"F (S (C (is_in_forest) :: A (follow_map)) :: {bt_attack_and_chase})"},
+    "LR_out_of_forest": {
+        "bt": f"F (S (C (is_in_forest) :: A (follow_map toward)) :: {bt_attack_and_stay_out_of_range})"
+    },
+    "SR_out_of_forest": {"bt": f"F (S (C (is_in_forest) :: A (follow_map toward)) :: {bt_attack_and_chase})"},
     "Test": {"bt": f"F (S (C (is_in_forest) :: A (move north)) :: A (move west))"},
 }
 
@@ -146,3 +152,28 @@ LLM_BTs = {
     "test": "Test",
 }
 # -
+
+
+def bt_fn(bt_str):
+    dsl_tree = btc2sim.dsl.parse(btc2sim.dsl.read(bt_str))
+    bt = btc2sim.bt.seed_fn(dsl_tree)
+    return lambda obs, env_info, agent_info, rng: bt(obs, env_info, agent_info, rng)[1]
+
+
+def bt_bank_jit():
+    bts_bank = {}
+    bts_bank_variant_subsets = {}
+    for key, bt in handcrafted_bts.items():
+        subsets, variants = compute_all_variants(bt["bt"], unit_types)
+        bts_bank_variant_subsets[key] = subsets
+        for i, bt_txt in enumerate(variants):
+            name = key + (("_" + str(i)) if len(variants) > 1 else "")
+            bts_bank[name] = bt_fn(bt_txt)
+    return bts_bank, bts_bank_variant_subsets
+
+
+def find_bt_key(bt_name, subset, bts_bank_variant_subsets):
+    if len(bts_bank_variant_subsets[bt_name]) == 1:
+        return bt_name
+    else:
+        return bt_name + "_" + str(bts_bank_variant_subsets[bt_name].index(subset))
