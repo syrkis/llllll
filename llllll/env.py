@@ -1,4 +1,4 @@
-from btc2sim import btc2sim
+import btc2sim
 import parabellum as pb
 import numpy as np
 import jax.numpy as jnp
@@ -52,67 +52,3 @@ def compute_bfs(mask, goal):
 
         current_x, current_y = new_x, new_y
     return np.array(directions, dtype=int), np.array(costs, dtype=int)
-
-
-@dataclass
-class Objective:
-    def check(self, game, concerned_units):  # type: ignore
-        return False
-
-
-@dataclass
-class EliminationObjective(Objective):
-    target_units: list
-
-    def check(self, game, _):  # type: ignore
-        return np.sum([game.state.unit_health[i] for i in self.target_units]) == 0
-
-
-@dataclass
-class PositionObjective(Objective):
-    target_position: dict  # unit_id: (x, y)
-    concerned_units_per_target: dict  # (x, y): [unit_ids]
-    strict: bool = True
-
-    def get_distances_to_targets(self, game, concerned_units):
-        return {
-            target: 1
-            + np.ceil(
-                np.sum(
-                    [
-                        game.env.unit_type_radiuses[game.state.unit_types[j]] ** 2
-                        for j in self.concerned_units_per_target[target]
-                        if game.state.unit_health[j] > 0
-                    ]
-                )
-                ** 0.5
-            )
-            for target in self.concerned_units_per_target.keys()
-        }
-
-    def check(self, game, concerned_units):
-        distances = self.get_distances_to_targets(game, concerned_units)
-        if self.strict:
-            return (
-                np.sum(
-                    [
-                        jnp.linalg.norm(game.state.unit_positions[i] - jnp.array(self.target_position[i]))
-                        > distances[self.target_position[i]]
-                        for i in concerned_units
-                        if game.state.unit_health[i] > 0
-                    ]
-                )
-                == 0
-            )
-        else:
-            return (
-                np.sum(
-                    [
-                        jnp.linalg.norm(game.state.unit_positions[i] - jnp.array(self.target_position[i]))
-                        <= distances[self.target_position[i]]
-                        for i in concerned_units
-                        if game.state.unit_health[i] > 0
-                    ]
-                )
-                > 0
-            )

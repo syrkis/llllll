@@ -17,6 +17,7 @@ blinker==1.8.2
 box2d-py==2.3.5
 branca==0.8.0
 brax==0.10.0
+btc2sim==0.0.2
 build==1.2.2
 CacheControl==0.14.0
 Cartopy==0.23.0
@@ -65,6 +66,7 @@ folium==0.17.0
 fonttools==4.54.1
 fqdn==1.5.1
 fsspec==2024.9.0
+functional==0.4
 gast==0.6.0
 geographiclib==2.0
 geopandas==1.0.1
@@ -119,7 +121,7 @@ jupyterlab_server==2.27.3
 keyring==24.3.1
 kiwisolver==1.4.7
 lark==1.2.2
--e git+ssh://git@github.com/syrkis/llllll.git@3016fe183c5722d8ddc51a9d25ce6c5c2456b014#egg=llllll
+-e git+ssh://git@github.com/syrkis/llllll.git@b434bbc8997bcfbf4928a060af98a6d1f5f234ba#egg=llllll
 markdown-it-py==3.0.0
 MarkupSafe==2.1.5
 matplotlib==3.9.2
@@ -139,6 +141,7 @@ nbconvert==7.16.4
 nbformat==5.10.4
 nest-asyncio==1.6.0
 networkx==3.3
+notebook==7.2.2
 notebook_shim==0.2.4
 numpy==1.26.4
 ollama==0.3.3

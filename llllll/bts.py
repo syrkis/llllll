@@ -1,6 +1,6 @@
 # # Imports
 
-from btc2sim import btc2sim
+import btc2sim
 from itertools import chain, combinations
 from functools import lru_cache, partial
 from jax import tree_util

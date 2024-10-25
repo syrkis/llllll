@@ -3,7 +3,7 @@
 
 
 # %% Imports
-from btc2sim import btc2sim
+import btc2sim
 import jax
 from jax import random, vmap, tree_util
 from functools import partial
