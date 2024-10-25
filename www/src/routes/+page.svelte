@@ -10,31 +10,16 @@
 
 <style>
     .container {
-        display: grid;
-        grid-template-columns: 100vh 1fr;
-        grid-template-rows: 1fr;
+        display: flex;
         width: 100vw;
+        height: 100vh; /* Set container to full height */
+        flex-direction: column; /* Stack columns vertically */
     }
 
-    #sim {
-        grid-column: 1;
-        height: 100%;
-        width: 100%;
-    }
-
-    #con {
-        grid-column: 2;
-    }
-
-    @media (max-aspect-ratio: 1/1) {
+    /* For landscape orientation (wider than taller) */
+    @media (min-aspect-ratio: 1/1) {
         .container {
-            grid-template-columns: 1fr;
-            grid-template-rows: auto auto;
-        }
-
-        #sim,
-        #con {
-            grid-column: 1;
+            flex-direction: row; /* Stack rows horizontally */
         }
     }
 </style>

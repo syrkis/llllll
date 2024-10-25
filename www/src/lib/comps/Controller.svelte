@@ -343,11 +343,16 @@
 
 <style>
     #controller {
-        height: 96vh;
-        margin: 2vh 2vh 2vh 0;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
+        height: 96vh; /* Default to using most of the viewport height */
+        margin: 2vh;
+    }
+
+    @media (max-aspect-ratio: 1/1) {
+        #controller {
+            height: 96vw;
+        }
     }
 
     li {
@@ -384,34 +389,28 @@
             opacity 0.5s ease 0.5s; /* Ensure transitions take place sequentially */
     }
     .pieces {
-        padding: 0 1rem 3rem 1rem;
-        font-size: 3rem;
+        padding: 40px 1rem;
         text-align: center;
-        user-select: none; /* Standard syntax */
     }
 
     .history {
+        flex: 1; /* Take up all available space */
         overflow-y: auto;
-        height: 100%;
-        flex-grow: 1;
         scroll-behavior: smooth;
     }
 
     .command-history {
+        height: 120px;
         overflow-y: auto;
-        height: 6vw;
         padding: 0.5rem;
         border-radius: 5px;
         font-family: monospace;
-        line-height: 2;
-        /* make fontsize responsive to the width of the controler*/
-        font-size: 0.9vw;
-        /* white-space: nowrap; */
     }
 
     .command-history-header {
         font-size: inherit;
         font-weight: bold;
+        font-size: 0.9rem;
     }
 
     .bot {
@@ -427,7 +426,7 @@
     }
 
     .input {
-        padding: 0.5rem;
+        padding-top: 1rem;
     }
 
     .input input {
@@ -446,6 +445,10 @@
         .bot,
         .user {
             font-size: 0.9rem;
+        }
+        .command-history,
+        .command-history-header {
+            font-size: 0.7rem;
         }
 
         .input input {

@@ -197,10 +197,11 @@
 
 <style>
     #simulation {
-        padding: 2vh;
-        height: 96vh;
-        width: 96vh;
+        padding: min(2vh, 2vw);
+        height: min(96vh, 96vw);
+        width: min(96vh, 96vw);
     }
+
     svg {
         height: 100%;
         width: 100%;
