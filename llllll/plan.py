@@ -40,12 +40,21 @@ unit_types_set = {"soldier", "sniper", "swat", "turret", "civilian"}
 
 
 # %% Constants
-default_plan = f"""Step 0:
+enemy_plan = f"""Step 0:
 prerequisites: []
 objective: position
 units: all
 - target position: {(5, 5)}
 - behavior: stand
+"""
+
+
+ally_plan = f"""Step 0:
+prerequisites: []
+objective: position
+units: all
+- target position: {(50, 50)}
+- behavior: ignore_enemies
 """
 
 
@@ -147,7 +156,7 @@ def compute_direction_map(game, target):
     target = (int(target[0]), int(target[1]))
     mask = jnp.logical_or(game.env.terrain.building, game.env.terrain.water)
     if target not in game.direction_maps:
-        game.direction_maps[target] = ll.env.compute_bfs(mask, target)
+        game.direction_maps[target] = ll.env.compute_bfs(mask, target)[0]
 
 
 def reset_plan(game):

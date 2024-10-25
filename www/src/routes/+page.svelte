@@ -25,4 +25,16 @@
     #con {
         grid-column: 2;
     }
+
+    @media (max-aspect-ratio: 1/1) {
+        .container {
+            grid-template-columns: 1fr;
+            grid-template-rows: auto auto;
+        }
+
+        #sim,
+        #con {
+            grid-column: 1;
+        }
+    }
 </style>

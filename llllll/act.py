@@ -14,15 +14,6 @@ from dataclasses import field
 from llllll import bts
 # import llllll as ll
 
-# %% Constants
-default_plan = f"""Step 0:
-prerequisites: []
-objective: position
-units: all
-- target position: {(5, 5)}
-- behavior: Stand
-"""
-
 
 # %% Functions
 def step_fn(env, env_info, agents_info, bt_fns):
@@ -45,14 +36,3 @@ def step_fn(env, env_info, agents_info, bt_fns):
         return obs, state, acts
 
     return step
-
-
-def eval_bt(bt, obs, env_info, agent_info, rng):  # take actions for all agents in parallel
-    acts = tree_util.tree_map(lambda x, i: bt(x, env_info, i, rng)[1], obs, agent_info)
-    return acts
-
-
-def bts_fn(bt_strs):
-    dsl_trees = [btc2sim.dsl.parse(btc2sim.dsl.read(bt_str)) for bt_str in bt_strs]
-    bts = [btc2sim.bt.seed_fn(dsl_tree) for dsl_tree in dsl_trees]
-    return [partial(eval_bt, bt) for bt in bts]

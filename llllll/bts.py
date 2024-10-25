@@ -2,7 +2,8 @@
 
 from btc2sim import btc2sim
 from itertools import chain, combinations
-from functools import lru_cache
+from functools import lru_cache, partial
+from jax import tree_util
 
 
 # # Functions
@@ -105,51 +106,51 @@ handcrafted_bts = {
         "bt": "A (follow_map toward)",
         "description": "The units follow their direction map (stand if not direction map)",
     },
-    "Attack": {
-        "bt": set_default(bt_attack_and_wait, "A (follow_map toward)"),
-        "description": "The units attack all the enemies in range.",
-    },
-    "Attack_in_close_range": {
-        "bt": set_default(bt_attack_and_chase, "A (follow_map toward)"),
-        "description": "The units wait for their opponent, attack them and then move toward them.",
-    },
-    "Attack_in_long_range": {
-        "bt": set_default(bt_attack_and_stay_out_of_range, "A (follow_map toward)"),
-        "description": "Attack while keeping out of reach of the enemy.",
-    },
-    "Flee": {
-        "bt": set_default(bt_flee, "A (follow_map toward)"),
-        "description": "Move away from closest foe in sight.",
-    },
-    "Follow_allies": {
-        "bt": "F (A (move toward closest foe) :: A (stand))",
-        "description": "Move toward the closest foe in sight. (For the NPC civilians)",
-    },
-    "Defend": {"bt": bt_attack_and_wait, "description": "The units attack all the enemies in range without moving."},
-    "Defend_contact": {
-        "bt": bt_attack_and_chase,
-        "description": "The units attack all the enemies in range without moving.",
-    },
-    "LR_out_of_forest": {
-        "bt": f"F (S (C (is_in_forest) :: A (follow_map toward)) :: {bt_attack_and_stay_out_of_range})"
-    },
-    "SR_out_of_forest": {"bt": f"F (S (C (is_in_forest) :: A (follow_map toward)) :: {bt_attack_and_chase})"},
-    "Test": {"bt": f"F (S (C (is_in_forest) :: A (move north)) :: A (move west))"},
+    # "Attack": {
+    # "bt": set_default(bt_attack_and_wait, "A (follow_map toward)"),
+    # "description": "The units attack all the enemies in range.",
+    # },
+    # "Attack_in_close_range": {
+    # "bt": set_default(bt_attack_and_chase, "A (follow_map toward)"),
+    # "description": "The units wait for their opponent, attack them and then move toward them.",
+    # },
+    # "Attack_in_long_range": {
+    # "bt": set_default(bt_attack_and_stay_out_of_range, "A (follow_map toward)"),
+    # "description": "Attack while keeping out of reach of the enemy.",
+    # },
+    # "Flee": {
+    # "bt": set_default(bt_flee, "A (follow_map toward)"),
+    # "description": "Move away from closest foe in sight.",
+    # },
+    # "Follow_allies": {
+    # "bt": "F (A (move toward closest foe) :: A (stand))",
+    # "description": "Move toward the closest foe in sight. (For the NPC civilians)",
+    # },
+    # "Defend": {"bt": bt_attack_and_wait, "description": "The units attack all the enemies in range without moving."},
+    # "Defend_contact": {
+    # "bt": bt_attack_and_chase,
+    # "description": "The units attack all the enemies in range without moving.",
+    # },
+    # "LR_out_of_forest": {
+    # "bt": f"F (S (C (is_in_forest) :: A (follow_map toward)) :: {bt_attack_and_stay_out_of_range})"
+    # },
+    # "SR_out_of_forest": {"bt": f"F (S (C (is_in_forest) :: A (follow_map toward)) :: {bt_attack_and_chase})"},
+    # "Test": {"bt": f"F (S (C (is_in_forest) :: A (move north)) :: A (move west))"},
 }
 
 LLM_BTs = {
     "stand": "Stand",
     "ignore_enemies": "Follow_map",
-    "flee": "Flee",
-    "attack_in_close_range": "Attack_in_close_range",
-    "attack_static": "Attack",
-    "attack_in_long_range": "Attack_in_long_range",
-    "to_contact": "Follow_allies",
-    "defend": "Defend",
-    "defend_contact": "Defend_contact",
-    "sr_out_of_forest": "SR_out_of_forest",
-    "lr_out_of_forest": "LR_out_of_forest",
-    "test": "Test",
+    # "flee": "Flee",
+    # "attack_in_close_range": "Attack_in_close_range",
+    # "attack_static": "Attack",
+    # "attack_in_long_range": "Attack_in_long_range",
+    # "to_contact": "Follow_allies",
+    # "defend": "Defend",
+    # "defend_contact": "Defend_contact",
+    # "sr_out_of_forest": "SR_out_of_forest",
+    # "lr_out_of_forest": "LR_out_of_forest",
+    # "test": "Test",
 }
 # -
 
@@ -158,6 +159,17 @@ def bt_fn(bt_str):
     dsl_tree = btc2sim.dsl.parse(btc2sim.dsl.read(bt_str))
     bt = btc2sim.bt.seed_fn(dsl_tree)
     return lambda obs, env_info, agent_info, rng: bt(obs, env_info, agent_info, rng)[1]
+
+
+def bts_fn(bt_strs):
+    dsl_trees = [btc2sim.dsl.parse(btc2sim.dsl.read(bt_str)) for bt_str in bt_strs]
+    bts = [btc2sim.bt.seed_fn(dsl_tree) for dsl_tree in dsl_trees]
+    return [partial(eval_bt, bt) for bt in bts]
+
+
+def eval_bt(bt, obs, env_info, agent_info, rng):  # take actions for all agents in parallel
+    acts = tree_util.tree_map(lambda x, i: bt(x, env_info, i, rng)[1], obs, agent_info)
+    return acts
 
 
 def bt_bank_jit():
@@ -169,7 +181,10 @@ def bt_bank_jit():
         for i, bt_txt in enumerate(variants):
             name = key + (("_" + str(i)) if len(variants) > 1 else "")
             bts_bank[name] = bt_fn(bt_txt)
-    return bts_bank, bts_bank_variant_subsets
+
+    bt_name_dict = {key: i for i, key in enumerate(bts_bank.keys())}
+    list_of_trees = list(bts_bank.values())
+    return list_of_trees, bts_bank_variant_subsets, bt_name_dict
 
 
 def find_bt_key(bt_name, subset, bts_bank_variant_subsets):

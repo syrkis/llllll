@@ -79,7 +79,7 @@ class Game:
         self.ally_plan = ally_plan
         self.enemy_plan = enemy_plan
         self.direction_maps: Dict = {}
-        self.assigned_bts = {a: None for a in env.agents}
+        self.assigned_bts = {a: 4 for a in env.agents}
         self.bt_name_dict = bt_name_dict
 
         # self.step_fn = jit(env.step)
@@ -91,15 +91,14 @@ async def game_create(place):
     game_id = str(uuid.uuid4())
     if game_id in games:
         return game_id
-    bts_txt = ["A (move north)", "A (move east)"]
-    bt_fns = ll.act.bts_fn(bts_txt)
+    # bts_txt = ["A (move north)", "A (move east)"]
+    bts_fns, bts_bank_variant_subsets, bt_name_dict = ll.bts.bt_bank_jit()
+    # bt_fns = ll.act.bts_fn(bts_bank)
     env, env_info, agent_info = ll.env.create_env(place)
     # assigned_bts = {a: int(a.startswith("e")) for a in env.agents}
 
-    bts_bank, bts_bank_variant_subsets = ll.bts.bt_bank_jit()
-    bt_name_dict = {key: i for i, key in enumerate(bts_bank.keys())}
     enemy_plan = ll.plan.parse_plan(
-        ll.plan.default_plan,
+        ll.plan.enemy_plan,
         env.num_allies,
         env.num_enemies,
         3,
@@ -110,7 +109,7 @@ async def game_create(place):
     )
 
     ally_plan = ll.plan.parse_plan(
-        ll.plan.default_plan,
+        ll.plan.ally_plan,
         env.num_allies,
         env.num_enemies,
         2,
@@ -119,7 +118,7 @@ async def game_create(place):
         bts_bank_variant_subsets,
     )
 
-    step = ll.act.step_fn(env, env_info, agent_info, bt_fns)
+    step = ll.act.step_fn(env, env_info, agent_info, bts_fns)
     rng, key = random.split(random.PRNGKey(0))
     obs, state = env.reset(key)
     game = Game(game_id, env, step, state, obs, rng, env_info, agent_info, ally_plan, enemy_plan, bt_name_dict)
@@ -233,29 +232,34 @@ async def pause_game(game_id: str):
         return {"message": "Game is already paused"}
 
 
-# @app.post("/games/{game_id}/step")
-# async def step_game_endpoint(game_id: str):
-#     if game_id not in games:
-#         raise HTTPException(status_code=404, detail="Game not found")
-#     game = games[game_id]
-#     if game.terminal or not game.state:
-#         raise HTTPException(status_code=400, detail="Game is already finished or not initialized")
-
-#     # Execute a single step
-#     # new_state = step_game(game)
-#     game.state = new_state
-#     state_dict = {
-#         "unit_positions": new_state.unit_positions.tolist(),
-#         "unit_alive": new_state.unit_alive.tolist(),
-#         "unit_teams": new_state.unit_teams.tolist(),
-#         "unit_health": new_state.unit_health.tolist(),
-#         "unit_types": new_state.unit_types.tolist(),
-#         "unit_weapon_cooldowns": new_state.unit_weapon_cooldowns.tolist(),
-#         "prev_attack_actions": new_state.prev_attack_actions.tolist(),
-#         "time": new_state.time.item(),  # type: ignore
-#         "terminal": new_state.terminal.item(),  # type: ignore
-#     }
-#     return JSONResponse(content={"state": state_dict}, status_code=200)
+@app.post("/games/{game_id}/step")
+async def step_game_endpoint(game_id: str):
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+    game = games[game_id]
+    if game.terminal or not game.state:
+        raise HTTPException(status_code=400, detail="Game is already finished or not initialized")
+    # Execute a single step
+    ll.plan.apply_plan(game)
+    game.rng, key = random.split(game.rng)
+    print(game.agent_info["ally_0"].direction_map)
+    new_obs, new_state, actions = game.step_fn(game.obs, game.state, key, game.assigned_bts)
+    game.state = new_state
+    game.terminal = new_state.terminal  # Convert to Python bool
+    game.state = new_state
+    print(game.assigned_bts, actions)
+    state_dict = {
+        "unit_positions": new_state.unit_positions.tolist(),
+        "unit_alive": new_state.unit_alive.tolist(),
+        "unit_teams": new_state.unit_teams.tolist(),
+        "unit_health": new_state.unit_health.tolist(),
+        "unit_types": new_state.unit_types.tolist(),
+        "unit_weapon_cooldowns": new_state.unit_weapon_cooldowns.tolist(),
+        "prev_attack_actions": new_state.prev_attack_actions.tolist(),
+        "time": new_state.time.item(),  # type: ignore
+        "terminal": new_state.terminal.item(),  # type: ignore
+    }
+    return JSONResponse(content={"state": state_dict}, status_code=200)
 
 
 @app.post("/games/{game_id}/quit")
