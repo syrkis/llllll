@@ -346,12 +346,12 @@
         display: flex;
         flex-direction: column;
         height: 96vh; /* Default to using most of the viewport height */
-        margin: 2vh;
+        margin: 2vh 2vh 2vh 0;
     }
 
     @media (max-aspect-ratio: 1/1) {
         #controller {
-            height: 96vw;
+            height: calc(100vh - 100vw);
         }
     }
 
@@ -388,8 +388,9 @@
             font-size 0.5s ease,
             opacity 0.5s ease 0.5s; /* Ensure transitions take place sequentially */
     }
+
     .pieces {
-        padding: 40px 1rem;
+        padding: 0 0 40px 0;
         text-align: center;
     }
 
@@ -400,7 +401,7 @@
     }
 
     .command-history {
-        height: 120px;
+        height: 100px;
         overflow-y: auto;
         padding: 0.5rem;
         border-radius: 5px;
@@ -448,7 +449,8 @@
         }
         .command-history,
         .command-history-header {
-            font-size: 0.7rem;
+            font-size: 0.6rem;
+            height: 100px;
         }
 
         .input input {

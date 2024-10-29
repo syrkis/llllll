@@ -11,7 +11,7 @@ def create_env(place):
     env_info = btc2sim.info.env_info_fn(env)
     # _, distances = compute_bfs(1 - (jnp.logical_or(env.terrain.building, env.terrain.water)), (45, 25))  # TODO: change
     # agents_info = btc2sim.info.agent_info_fn(env, {f"ally_{i}": distances for i in range(env.num_allies)})
-    agents_info = btc2sim.info.agent_info_fn(env, {})
+    agents_info = btc2sim.info.agent_info_fn_to_vmap(env, {})
     return env, env_info, agents_info
 
 
@@ -51,4 +51,4 @@ def compute_bfs(mask, goal):
             new_y = np.concatenate([new_y, neighbors_y[valid_idx]])
 
         current_x, current_y = new_x, new_y
-    return np.array(directions, dtype=int), np.array(costs, dtype=int)
+    return jnp.array(directions, dtype=int), jnp.array(costs, dtype=int)

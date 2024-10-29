@@ -335,13 +335,13 @@ develop = ["pytest", "transforms3d"]
 
 [[package]]
 name = "btc2sim"
-version = "0.0.2"
+version = "0.0.3"
 description = ""
 optional = false
 python-versions = "<3.12,>=3.11"
 files = [
-    {file = "btc2sim-0.0.2-py3-none-any.whl", hash = "sha256:c0e8b1fc5c29abf03f087f7f4b1d79673e896a61c7df0431047ebfc2fc4e6db5"},
-    {file = "btc2sim-0.0.2.tar.gz", hash = "sha256:be99cf534bd96ad7ccad7dd6f5288e990dee8f126a74f4396412c12d4ca57f5c"},
+    {file = "btc2sim-0.0.3-py3-none-any.whl", hash = "sha256:747c179ed616d5da466caa8f09dac12d52d0f54387f64b1bc59c4ad2f9c4b006"},
+    {file = "btc2sim-0.0.3.tar.gz", hash = "sha256:59490ae678d0474488c78fd88302c7b64ac47fa215133bd2c7410da30e1d1500"},
 ]
 
 [package.dependencies]
@@ -6677,4 +6677,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "e2598fa4b960e78e008a0020ad303238eabaf48fc82a5e8a75f318f2e907169c"
+content-hash = "4018e05e5796b67af87dbe6c2024000aa1cbf3ba84d711eddc6cf94fcdf4b264"

@@ -242,7 +242,7 @@ async def step_game_endpoint(game_id: str):
     # Execute a single step
     ll.plan.apply_plan(game)
     game.rng, key = random.split(game.rng)
-    print(game.agent_info["ally_0"].direction_map)
+    # print(game.agent_info["ally_0"].direction_map)
     new_obs, new_state, actions = game.step_fn(game.obs, game.state, key, game.assigned_bts)
     game.state = new_state
     game.terminal = new_state.terminal  # Convert to Python bool

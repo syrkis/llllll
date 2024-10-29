@@ -10,7 +10,6 @@ from typing import Tuple, List, Dict, Optional, Callable
 import parabellum as pb
 import numpy as np
 
-# from plot import int_to_color
 # import utils
 import datetime
 from copy import deepcopy
@@ -156,7 +155,7 @@ def compute_direction_map(game, target):
     target = (int(target[0]), int(target[1]))
     mask = jnp.logical_or(game.env.terrain.building, game.env.terrain.water)
     if target not in game.direction_maps:
-        game.direction_maps[target] = ll.env.compute_bfs(mask, target)[0]
+        game.direction_maps[target] = ll.env.compute_bfs(mask, target)[1]
 
 
 def reset_plan(game):
@@ -199,9 +198,9 @@ def apply_plan(game):  # changes bt and target of each agent.
     for unit_id in range(
         game.env.num_agents
     ):  # reset the direction map of each unit so that it stands if no direction map is given and it uses the follow_direction atomic
-        game.agent_info[
-            f"ally_{unit_id}" if unit_id < game.env.num_allies else f"enemy_{unit_id-game.env.num_allies}"
-        ].direction_map = jnp.ones(game.env.terrain.building.shape, dtype=jnp.int32) * 4
+        game.agent_info.direction_map = game.agent_info.direction_map.at[unit_id].set(
+            jnp.ones(game.env.terrain.building.shape, dtype=jnp.int32)
+        )
     for current_step in current_ally_steps + current_enemy_steps:
         for unit_id in current_step.units:
             unit_name = game.env.agents[unit_id]  # maybe
@@ -211,9 +210,9 @@ def apply_plan(game):  # changes bt and target of each agent.
                 target = current_step.target_pos[unit_id]
                 if target not in game.direction_maps:
                     compute_direction_map(game, target)
-                game.agent_info[
-                    f"ally_{unit_id}" if unit_id < game.env.num_allies else f"enemy_{unit_id-game.env.num_allies}"
-                ].direction_map = game.direction_maps[target]
+                game.agent_info.direction_map = game.agent_info.direction_map.at[unit_id].set(
+                    game.direction_maps[target]
+                )
     return 0
 
 
