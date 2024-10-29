@@ -43,7 +43,7 @@ enemy_plan = f"""Step 0:
 prerequisites: []
 objective: position
 units: all
-- target position: {(5, 5)}
+- target position: {(50, 50)}
 - behavior: stand
 """
 
@@ -153,7 +153,7 @@ def initialize_plan(game):
 
 def compute_direction_map(game, target):
     target = (int(target[0]), int(target[1]))
-    mask = jnp.logical_or(game.env.terrain.building, game.env.terrain.water)
+    mask = 1 - jnp.logical_or(game.env.terrain.building, game.env.terrain.water)
     if target not in game.direction_maps:
         game.direction_maps[target] = ll.env.compute_bfs(mask, target)[1]
 

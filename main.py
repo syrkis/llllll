@@ -28,7 +28,7 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
 )
 games = {}
-sleep_time = 1.0
+sleep_time = 0.1
 
 
 def game_info_fn(env):
@@ -242,12 +242,13 @@ async def step_game_endpoint(game_id: str):
     # Execute a single step
     ll.plan.apply_plan(game)
     game.rng, key = random.split(game.rng)
-    # print(game.agent_info["ally_0"].direction_map)
     new_obs, new_state, actions = game.step_fn(game.obs, game.state, key, game.assigned_bts)
     game.state = new_state
     game.terminal = new_state.terminal  # Convert to Python bool
     game.state = new_state
     print(game.assigned_bts, actions)
+    print(game.agent_info.direction_map[0])
+    # print(jnp.logical_or(game.env.terrain.building, game.env.terrain.water))
     state_dict = {
         "unit_positions": new_state.unit_positions.tolist(),
         "unit_alive": new_state.unit_alive.tolist(),
