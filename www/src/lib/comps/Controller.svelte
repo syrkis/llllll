@@ -167,16 +167,21 @@
             case "r":
                 if (gameId) {
                     try {
+                        // First pause the game
+                        await pauseGame(gameId);
+
+                        // Then reset
                         const { state } = await resetGame(gameId);
                         gameStore.setState(state);
                         updateVisualization();
-                        commandResponse = "reset state";
+                        commandResponse = "paused and reset state";
                     } catch (error) {
                         console.error("Error resetting the game state:", error);
                         commandResponse = "Error resetting game state. Please try again.";
                     }
                 }
                 break;
+
             case "quit":
             case "q":
                 if (gameId) {
