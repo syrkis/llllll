@@ -305,11 +305,9 @@ async def quit_game(game_id: str):
 
 #################### LLM API ####################
 async def send_to_llm(message: str) -> str:
-    response = {
-        "input": message,
-        "output": f"the winning plan is: [BEGIN PLAN]{ll.env.winning_plan}[END PLAN]",
-    }
-    return response["output"]
+    return ll.llm.discuss_plan_with_LLM(ll.llm.config, message, [], [{"role": "system", "content": "I love plans"}])[
+        "answer"
+    ]
 
 
 class MessageRequest(BaseModel):
@@ -323,60 +321,11 @@ async def process_message(game_id: str, request: MessageRequest):
         raise HTTPException(status_code=404, detail="Game not found")
     game = games[game_id]
     processed_message = await send_to_llm(message)
-    plan = handle_LLM_plan(game, processed_message)
+    plan = ll.llm.handle_LLM_plan(game, processed_message)
     games[game_id].ally_plan = plan
     return {"response": processed_message}
 
 
-def action_fn(env, bts, state, act_keys):
-    actions = {agent: env.action_space(agent).sample(step_key) for agent, step_key in zip(env.agents, act_keys)}
-    return actions
-
-
-def handle_LLM_plan(game, answer_txt):
-    if (
-        "[BEGIN PLAN]" in answer_txt
-        and "[END PLAN]" in answer_txt
-        and answer_txt.count("[BEGIN PLAN]") == answer_txt.count("[END PLAN]")
-    ):
-        offset = 0
-        nl_txt = ""
-        # plans = []
-        # reset_selected_plan(game)
-        for i in range(answer_txt.count("[BEGIN PLAN]")):
-            i_start = answer_txt.index("[BEGIN PLAN]", offset)
-            i_end = answer_txt.index("[END PLAN]", i_start)
-            nl_txt = answer_txt[offset : i_start - 1]
-            name = nl_txt.split("\n")[-1].split(":")[0].replace("*", "")
-            offset = i_end + 9
-            plan_txt = answer_txt[i_start + 11 : i_end - 1]
-            # game.control.llm_text.append(llm_text(nl_txt))
-            plan = ll.plan.parse_plan(
-                plan_txt,
-                game.env.num_allies,
-                game.env.num_enemies,
-                3,  # why is there a 3 here?
-                ["position", "eliminate"],
-                ll.bts.LLM_BTs,
-                game.bts_bank_variant_subsets,
-                # for_ally=False,
-            )
-            return plan
-
-            # game.control.plans.append(
-            # {"plan": plan, "text": plan_txt, "name": name, "validity": ("\nValid plan!", "forestgreen")}
-            # )
-            # except PlanParsingError as err:
-            # game.control.plans.append(
-            # {
-            # "plan": [],
-            # "text": plan_txt,
-            # "name": name,
-            # "validity": ("\nInvalid plan!\n" + str(err), "crimson"),
-            # }
-            # )
-        # game.control.llm_text.append(llm_text(answer_txt[offset:]))
-        # if len(game.control.plans) == 1:
-        # game_select_plan(game, 0)
-    # else:
-    # game.control.llm_text.append(llm_text(answer_txt + "\n"))
+# def action_fn(env, bts, state, act_keys):
+#     actions = {agent: env.action_space(agent).sample(step_key) for agent, step_key in zip(env.agents, act_keys)}
+#     return actions
