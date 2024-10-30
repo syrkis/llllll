@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
-    import { gameStore, scale, piecesStore } from "$lib/store";
+    import { gameStore, scale, piecesStore, transitionDurations } from "$lib/store";
     import { createBackgroundGrid } from "$lib/scene";
     import { get } from "svelte/store";
     import * as d3 from "d3";
@@ -124,20 +124,21 @@
     $: drawMarkers();
 
     function drawMarkers() {
+        const duration = $transitionDurations.marker;
         const svg = d3.select<SVGSVGElement, unknown>(svgElement);
 
         const activePieces = $piecesStore.filter((p) => p.active);
         const pieces = svg.selectAll<SVGTextElement, Piece>("text").data(activePieces, (d) => d.symbol);
 
         // Handle exiting pieces with transition
-        pieces.exit().transition().duration(300).style("opacity", 0).style("font-size", "0em").remove();
+        pieces.exit().transition().duration(duration).style("opacity", 0).style("font-size", "0em").remove();
 
         // Enter active pieces
         const piecesEnter = pieces
             .enter()
             .append("text")
             .attr("x", (d) => d.x)
-            .attr("y", (d) => d.y)
+            .attr("y", (d) => 100 - d.y)
             .attr("class", "piece ink")
             .attr("text-anchor", "middle")
             .attr("dominant-baseline", "central")
@@ -150,7 +151,7 @@
         // Update active elements positioning
         pieces
             .attr("x", (d) => d.x)
-            .attr("y", (d) => d.y)
+            .attr("y", (d) => 100 - d.y)
             .style("font-size", "3em")
             .style("opacity", 1);
     }

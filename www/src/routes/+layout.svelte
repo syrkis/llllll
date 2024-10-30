@@ -1,23 +1,26 @@
 <slot />
 
 <style>
+    :root {
+        --ally-color: #31511e;
+        --enemy-color: #8b2635;
+    }
     :global(.piece) {
         user-select: none;
         font-family: Arial, sans-serif;
         transition: transform 0.3s ease-in-out;
     }
     :global(.ink) {
-        fill: black;
         stroke: black;
         color: black;
     }
     :global(.ink.enemy) {
-        fill: black;
-        stroke: black;
+        fill: var(--enemy-color);
+        stroke: var(--enemy-color);
     }
     :global(.ink.ally) {
-        fill: white;
         stroke: black;
+        fill: var(--ally-color);
     }
     :global(body) {
         margin: 0;
@@ -30,16 +33,17 @@
     @media (prefers-color-scheme: dark) {
         :global(.ink) {
             fill: white;
+
             stroke: white;
             color: white;
         }
         :global(.ink.enemy) {
-            fill: white;
-            stroke: white;
+            fill: var(--enemy-color);
+            stroke: var(--enemy-color);
         }
         :global(.ink.ally) {
-            fill: black;
-            stroke: white;
+            fill: var(--ally-color);
+            stroke: var(--ally-color);
         }
         :global(body) {
             background-color: black;

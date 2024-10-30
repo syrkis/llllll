@@ -1,5 +1,7 @@
 import type * as d3 from "d3";
 import { easeCubicInOut } from "d3";
+import { transitionDurations } from "$lib/store";
+import { get } from "svelte/store";
 
 interface TerrainCell {
   value: number;
@@ -17,7 +19,7 @@ export function createBackgroundGrid(
     console.warn("Terrain matrix or scale is undefined");
     return;
   }
-
+  const duration = get(transitionDurations).terrain;
   const cellSize = scale(1) - scale(0);
   const maxSize = cellSize * 1; // Maximum size of the square, slightly smaller than cell size
   const minSize = 0.01; // Minimum size of the square for visibility
@@ -32,7 +34,7 @@ export function createBackgroundGrid(
 
   const cells = svg
     .selectAll<SVGRectElement, TerrainCell>(".terrain-cell")
-    .data(terrainData, (d: TerrainCell) => `${d.x}-${d.y}`);
+    .data(terrainData, (d: TerrainCell) => `${d.x}-${100 - d.y}`);
 
   // Enter selection
   const enter = cells
@@ -40,7 +42,7 @@ export function createBackgroundGrid(
     .append("rect")
     .attr("class", "terrain-cell ink")
     .attr("x", (d) => scale(d.x) + cellSize / 2)
-    .attr("y", (d) => scale(d.y) + cellSize / 2)
+    .attr("y", (d) => scale(100 - d.y) + cellSize / 2)
     .attr("width", 0)
     .attr("height", 0);
 
@@ -56,7 +58,7 @@ export function createBackgroundGrid(
       })
       .attr("y", (d) => {
         const size = Math.max(minSize, d.value ** 2 * maxSizeScaleFactor);
-        return scale(d.y) + (cellSize - size) / 2;
+        return scale(100 - d.y) + (cellSize - size) / 2 - cellSize;
       })
       .attr("width", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor))
       .attr("height", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor));
@@ -64,7 +66,7 @@ export function createBackgroundGrid(
     // Apply transition for updates
     merged
       .transition()
-      .duration(1000)
+      .duration(duration)
       .ease(easeCubicInOut)
       .attr("x", (d) => {
         const size = Math.max(minSize, d.value ** 2 * maxSizeScaleFactor);
@@ -72,7 +74,7 @@ export function createBackgroundGrid(
       })
       .attr("y", (d) => {
         const size = Math.max(minSize, d.value ** 2 * maxSizeScaleFactor);
-        return scale(d.y) + (cellSize - size) / 2;
+        return scale(100 - d.y) + (cellSize - size) / 2 - cellSize;
       })
       .attr("width", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor))
       .attr("height", (d) => Math.max(minSize, d.value ** 2 * maxSizeScaleFactor));

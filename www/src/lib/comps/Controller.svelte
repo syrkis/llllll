@@ -377,6 +377,7 @@
             font-size 0.5s ease,
             opacity 0.5s ease;
         text-align: center;
+        /* padding: 0 2.5rem; */
         width: 3rem; /* Maintain consistent space */
         height: 3rem; /* Consistent height */
     }

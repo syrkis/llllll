@@ -13,7 +13,7 @@ export interface GameStore {
 
 const initialTerrain: number[][] = Array.from({ length: 100 }, (_, rowIndex) =>
   Array.from({ length: 100 }, (_, colIndex) => {
-    return rowIndex % 3 === 0 && colIndex % 3 === 0 ? 3 : 0.1;
+    return rowIndex % 3 === 0 && colIndex % 3 === 0 ? 2 : 0;
   }),
 );
 
@@ -60,3 +60,19 @@ const initialPieces: ChessPiece[] = [
 ];
 
 export const piecesStore = writable<ChessPiece[]>(initialPieces);
+
+export interface TransitionDurations {
+  shape: number;
+  streak: number;
+  terrain: number;
+  marker: number;
+}
+
+const defaultTransitionDurations: TransitionDurations = {
+  shape: 500, // For unit shapes
+  streak: 500, // For attack streaks
+  terrain: 1000, // For terrain updates
+  marker: 500, // For markers/pieces
+};
+
+export const transitionDurations = writable<TransitionDurations>(defaultTransitionDurations);

@@ -1,7 +1,7 @@
 import * as d3 from "d3";
 import type { UnitData, Scenario, State } from "$lib/types";
 import { createBackgroundGrid } from "$lib/scene";
-import { gameStore, scale } from "$lib/store";
+import { gameStore, scale, transitionDurations } from "$lib/store";
 import { get } from "svelte/store";
 
 let terrainDrawn = false; // Track whether terrain has been drawn
@@ -45,7 +45,7 @@ function updateShapes(
 ) {
   const shapes = svg.selectAll<SVGPathElement, UnitData>(".shape").data(unitData, (d: UnitData, i) => i.toString());
   // Duration of the entering and exiting transition
-  const duration = 100;
+  const duration = get(transitionDurations).shape;
 
   const enterShapes = shapes
     .enter()
@@ -128,6 +128,7 @@ function updateAttackStreaks(
 
   const team0Units = unitData.filter((u) => u.team === 0);
   const team1Units = unitData.filter((u) => u.team === 1);
+  const duration = get(transitionDurations).streak;
 
   for (const agent of team0Units) {
     // Use for...of instead of forEach
@@ -146,7 +147,7 @@ function updateAttackStreaks(
           .attr("x2", x1)
           .attr("y2", y1)
           .transition()
-          .duration(100)
+          .duration(duration)
           .attr("x1", x2)
           .attr("y1", y2)
           .attr("stroke-opacity", 0)
@@ -157,17 +158,21 @@ function updateAttackStreaks(
 }
 
 function getPosition(d: UnitData, currentScale: d3.ScaleLinear<number, number>) {
-  return { x: currentScale(d.position[0]), y: currentScale(d.position[1]) };
-}
-
-function positionHealthBar(d: UnitData, currentScale: d3.ScaleLinear<number, number>) {
-  const position = getPosition(d, currentScale);
+  // Flip the y coordinate by subtracting from 100 (assuming 100x100 grid)
   return {
-    x: position.x - 5,
-    y: position.y - 15,
-    width: (d.health / d.maxHealth) * 10,
+    x: currentScale(d.position[0]),
+    y: currentScale(100 - d.position[1]), // HARD CODED FLIP (ASSUMING SIZE IS 100)
   };
 }
+
+// function positionHealthBar(d: UnitData, currentScale: d3.ScaleLinear<number, number>) {
+//   const position = getPosition(d, currentScale);
+//   return {
+//     x: position.x - 5,
+//     y: position.y - 15,
+//     width: (d.health / d.maxHealth) * 10,
+//   };
+// }
 
 function calculateStreakPositions(agent: UnitData, target: UnitData, currentScale: d3.ScaleLinear<number, number>) {
   const start = getPosition(agent, currentScale);
@@ -193,6 +198,7 @@ const UNIT_TYPES = {
 } as const;
 
 function createUnitShape(d: UnitData, x: number, y: number, radius: number): string {
+  // change y to be 100 - y
   switch (d.type) {
     case UNIT_TYPES.CIRCLE:
       // Circle
