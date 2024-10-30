@@ -19,6 +19,7 @@ ipython = "^8.29.0"
 jupyterlab = "^4.2.5"
 btc2sim = ">=0.0.6"
 openai = "^1.52.2"
+python-dotenv = "^1.0.1"
 
 
 [build-system]
