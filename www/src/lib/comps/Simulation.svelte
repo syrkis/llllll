@@ -138,7 +138,7 @@
             .enter()
             .append("text")
             .attr("x", (d) => d.x)
-            .attr("y", (d) => 100 - d.y)
+            .attr("y", (d) => d.y)
             .attr("class", "piece ink")
             .attr("text-anchor", "middle")
             .attr("dominant-baseline", "central")
