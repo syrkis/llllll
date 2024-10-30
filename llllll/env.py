@@ -3,26 +3,34 @@ import parabellum as pb
 import numpy as np
 import jax.numpy as jnp
 from chex import dataclass
+# from llllll import llm
 
 
 def create_env(place):
     if place.strip() == "paradise":
-        print(s_config["place"], pb.terrain_db.db.keys())
-        print("———————————————————————————————————————————————————————")
-        print("———————————————————————————————————————————————————————")
-        print("———————————————————————————————————————————————————————")
-        print("———————————————————————————————————————————————————————")
-        print("———————————————————————————————————————————————————————")
-        print("———————————————————————————————————————————————————————")
         scenario = pb.env.make_scenario(**s_config)
     else:
         scenario = pb.env.scenario_fn(place, 100)
-    env = pb.Environment(scenario)
+    env = pb.Environment(scenario, **env_kwargs)
     env_info = btc2sim.info.env_info_fn(env)
     # _, distances = compute_bfs(1 - (jnp.logical_or(env.terrain.building, env.terrain.water)), (45, 25))  # TODO: change
     # agents_info = btc2sim.info.agent_info_fn(env, {f"ally_{i}": distances for i in range(env.num_allies)})
     agents_info = btc2sim.info.agent_info_fn_to_vmap(env, {})
     return env, env_info, agents_info
+
+
+env_kwargs = {
+    "unit_type_velocities": jnp.array([1.0, 1.0, 4.0, 0.0, 0.0, 1.0]),
+    "unit_type_attacks": jnp.array([1.0, 2.0, 1.0, 10.0, 0.0, 0.0]),
+    "unit_type_attack_ranges": jnp.array([3.0, 15.0, 2.0, 5.0, 0.0, 0.0]),
+    "unit_type_sight_ranges": jnp.array([15.0, 15.0, 15.0, 5.0, 0.0, 10.0]),
+    "unit_type_radiuses": jnp.array([1.0, 0.5, 0.75, 0.3, 0.0, 0.1]),
+    "unit_type_health": jnp.array([50.0, 10.0, 30, 200.0, 0.0, 1.0]),
+    "unit_type_weapon_cooldowns": jnp.array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0]),
+    "unit_type_names": ["soldier", "sniper", "swat", "turret", "drone", "civilian"],
+    "unit_type_pushable": jnp.array([1, 1, 1.0, 0, 0, 1]),
+    "reset_when_done": False,
+}
 
 
 def compute_bfs(mask, goal):

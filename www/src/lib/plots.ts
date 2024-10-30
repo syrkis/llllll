@@ -46,7 +46,7 @@ function updateShapes(
   const shapes = svg.selectAll<SVGPathElement, UnitData>(".shape").data(unitData, (d, i) => i.toString());
 
   // Duration of the entering and exiting transition
-  const duration = 500;
+  const duration = 100;
 
   const enterShapes = shapes
     .enter()
@@ -148,7 +148,7 @@ function updateAttackStreaks(
           .attr("x2", x1)
           .attr("y2", y1)
           .transition()
-          .duration(500)
+          .duration(100)
           .attr("x1", x2)
           .attr("y1", y2)
           .attr("stroke-opacity", 0)

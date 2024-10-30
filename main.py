@@ -28,7 +28,7 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
 )
 games = {}
-sleep_time = 1.0
+sleep_time = 0.1
 
 
 def game_info_fn(env):
@@ -304,10 +304,9 @@ async def quit_game(game_id: str):
 
 
 #################### LLM API ####################
-async def send_to_llm(message: str) -> str:
-    return ll.llm.discuss_plan_with_LLM(ll.llm.config, message, [], [{"role": "system", "content": "I love plans"}])[
-        "answer"
-    ]
+async def send_to_llm(message: str, game: Game) -> str:
+    game_info = ll.llm.current_state_to_txt(game)  # [{"role": "system", "content": "You are a helpful assistant."}]
+    return ll.llm.discuss_plan_with_LLM(ll.llm.config, message, [], game_info)["answer"]
 
 
 class MessageRequest(BaseModel):
@@ -320,9 +319,10 @@ async def process_message(game_id: str, request: MessageRequest):
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
     game = games[game_id]
-    processed_message = await send_to_llm(message)
-    plan = ll.llm.handle_LLM_plan(game, processed_message)
-    games[game_id].ally_plan = plan
+    processed_message = await send_to_llm(message, game)
+    _plan = ll.llm.handle_LLM_plan(game, processed_message)
+    if _plan is not None:
+        games[game_id].ally_plan = _plan
     return {"response": processed_message}
 
 

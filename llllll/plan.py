@@ -23,8 +23,8 @@ from PIL import Image
 import matplotlib.pyplot as plt
 
 import parabellum as pb
-from llllll import bts
-import llllll as ll
+from llllll import bts, env
+# import llllll as ll
 
 
 # ### Objectives
@@ -39,7 +39,7 @@ unit_types_set = {"soldier", "sniper", "swat", "turret", "civilian"}
 
 
 # %% Constants
-enemy_plan = ll.env.enemy_plan
+enemy_plan = env.enemy_plan
 
 
 ally_plan = f"""Step 0:
@@ -151,7 +151,7 @@ def compute_direction_map(game, target):
     target = (int(target[0]), int(target[1]))
     mask = 1 - jnp.logical_or(game.env.terrain.building, game.env.terrain.water)
     if target not in game.direction_maps:
-        game.direction_maps[target] = ll.env.compute_bfs(mask, target)[1]
+        game.direction_maps[target] = env.compute_bfs(mask, target)[1]
 
 
 def reset_plan(game):
