@@ -28,7 +28,7 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
 )
 games = {}
-sleep_time = 0.1
+sleep_time = 1.0
 
 
 def game_info_fn(env):
@@ -64,7 +64,21 @@ class GameState(BaseModel):  # for the client
 
 
 class Game:
-    def __init__(self, id, env, step, state, obs, rng, env_info, agent_info, ally_plan, enemy_plan, bt_name_dict):
+    def __init__(
+        self,
+        id,
+        env,
+        step,
+        state,
+        obs,
+        rng,
+        env_info,
+        agent_info,
+        ally_plan,
+        enemy_plan,
+        bt_name_dict,
+        bts_bank_variant_subsets,
+    ):
         self.id = id
         self.env = env
         self.step_fn = step
@@ -81,6 +95,8 @@ class Game:
         self.direction_maps: Dict = {}
         self.assigned_bts = {a: 4 for a in env.agents}
         self.bt_name_dict = bt_name_dict
+        self.bts_bank_variant_subsets = bts_bank_variant_subsets
+        # self.plan = []
 
         # self.step_fn = jit(env.step)
 
@@ -121,7 +137,20 @@ async def game_create(place):
     step = ll.act.step_fn(env, env_info, agent_info, bts_fns)
     rng, key = random.split(random.PRNGKey(0))
     obs, state = env.reset(key)
-    game = Game(game_id, env, step, state, obs, rng, env_info, agent_info, ally_plan, enemy_plan, bt_name_dict)
+    game = Game(
+        game_id,
+        env,
+        step,
+        state,
+        obs,
+        rng,
+        env_info,
+        agent_info,
+        ally_plan,
+        enemy_plan,
+        bt_name_dict,
+        bts_bank_variant_subsets,
+    )
     ll.plan.initialize_plan(game)  # object hidden state stuff.
     games[game_id] = game
     return game_id, game_info_fn(env)
@@ -278,8 +307,8 @@ async def quit_game(game_id: str):
 async def send_to_llm(message: str) -> str:
     response = {
         "input": message,
-        "output": f"Processed message: {message}",
-    }  # Placeholder, replace with actual interaction logic
+        "output": f"the winning plan is: [BEGIN PLAN]{ll.env.winning_plan}[END PLAN]",
+    }
     return response["output"]
 
 
@@ -287,14 +316,67 @@ class MessageRequest(BaseModel):
     message: str
 
 
-@app.post("/process-message")
-async def process_message(request: MessageRequest):
+@app.post("/games/{game_id}/process-message")  # Changed route to include game_id
+async def process_message(game_id: str, request: MessageRequest):
     message = request.message
-    # Process the message with the LLM
-    processed_message = "blah balah lah"  # await send_to_llm(message)  # Assuming send_to_llm is defined
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+    game = games[game_id]
+    processed_message = await send_to_llm(message)
+    plan = handle_LLM_plan(game, processed_message)
+    games[game_id].ally_plan = plan
     return {"response": processed_message}
 
 
 def action_fn(env, bts, state, act_keys):
     actions = {agent: env.action_space(agent).sample(step_key) for agent, step_key in zip(env.agents, act_keys)}
     return actions
+
+
+def handle_LLM_plan(game, answer_txt):
+    if (
+        "[BEGIN PLAN]" in answer_txt
+        and "[END PLAN]" in answer_txt
+        and answer_txt.count("[BEGIN PLAN]") == answer_txt.count("[END PLAN]")
+    ):
+        offset = 0
+        nl_txt = ""
+        # plans = []
+        # reset_selected_plan(game)
+        for i in range(answer_txt.count("[BEGIN PLAN]")):
+            i_start = answer_txt.index("[BEGIN PLAN]", offset)
+            i_end = answer_txt.index("[END PLAN]", i_start)
+            nl_txt = answer_txt[offset : i_start - 1]
+            name = nl_txt.split("\n")[-1].split(":")[0].replace("*", "")
+            offset = i_end + 9
+            plan_txt = answer_txt[i_start + 11 : i_end - 1]
+            # game.control.llm_text.append(llm_text(nl_txt))
+            plan = ll.plan.parse_plan(
+                plan_txt,
+                game.env.num_allies,
+                game.env.num_enemies,
+                3,  # why is there a 3 here?
+                ["position", "eliminate"],
+                ll.bts.LLM_BTs,
+                game.bts_bank_variant_subsets,
+                # for_ally=False,
+            )
+            return plan
+
+            # game.control.plans.append(
+            # {"plan": plan, "text": plan_txt, "name": name, "validity": ("\nValid plan!", "forestgreen")}
+            # )
+            # except PlanParsingError as err:
+            # game.control.plans.append(
+            # {
+            # "plan": [],
+            # "text": plan_txt,
+            # "name": name,
+            # "validity": ("\nInvalid plan!\n" + str(err), "crimson"),
+            # }
+            # )
+        # game.control.llm_text.append(llm_text(answer_txt[offset:]))
+        # if len(game.control.plans) == 1:
+        # game_select_plan(game, 0)
+    # else:
+    # game.control.llm_text.append(llm_text(answer_txt + "\n"))

@@ -65,7 +65,7 @@ export type SVGSelection = d3.Selection<SVGSVGElement, unknown, null, undefined>
 export type CellVisualizationConfig = {
   size: number;
   offset: number;
-  shape: "rect" | "circle";
+  shape: "circle" | "rect" | "triangle";
   className: string;
 };
 

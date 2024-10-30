@@ -70,13 +70,17 @@ export async function quitGame(gameId: string): Promise<void> {
   }
 }
 
-export async function sendMessage(message: string): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/process-message`, {
+// In api.ts
+export async function sendMessage(gameId: string, message: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/games/${gameId}/process-message`, {
+    // Updated URL
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({
+      message: message,
+    }), // Only send message in body
   });
 
   if (!response.ok) {

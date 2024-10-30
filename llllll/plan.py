@@ -50,6 +50,8 @@ units: all
 - behavior: stand
 """
 
+# ally_plan = ll.env.winning_plan
+
 
 @dataclass
 class Objective:

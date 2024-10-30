@@ -86,7 +86,7 @@
         } else {
             history = [...history, { content: message, author: "user", type: "chat" }];
             try {
-                const llmResponse = await sendMessage(message);
+                const llmResponse = await sendMessage(gameId, message);
                 history = [...history, { content: llmResponse, author: "bot", type: "chat" }];
             } catch (error) {
                 console.error("Error processing message with LLM:", error);
