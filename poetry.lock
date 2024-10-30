@@ -335,13 +335,13 @@ develop = ["pytest", "transforms3d"]
 
 [[package]]
 name = "btc2sim"
-version = "0.0.3"
+version = "0.0.6"
 description = ""
 optional = false
 python-versions = "<3.12,>=3.11"
 files = [
-    {file = "btc2sim-0.0.3-py3-none-any.whl", hash = "sha256:747c179ed616d5da466caa8f09dac12d52d0f54387f64b1bc59c4ad2f9c4b006"},
-    {file = "btc2sim-0.0.3.tar.gz", hash = "sha256:59490ae678d0474488c78fd88302c7b64ac47fa215133bd2c7410da30e1d1500"},
+    {file = "btc2sim-0.0.6-py3-none-any.whl", hash = "sha256:830649006d06fe2db90f802cdb73211f1ba778543719700aaca895b60e46acdd"},
+    {file = "btc2sim-0.0.6.tar.gz", hash = "sha256:ccb34f2e3d0fed3b256f85a0c36aba746decdc6f00574f350d1b68cef08b0dce"},
 ]
 
 [package.dependencies]
@@ -351,7 +351,7 @@ ipykernel = ">=6.29.5,<7.0.0"
 jupyterlab = ">=4.2.4,<5.0.0"
 lark = ">=1.1.9,<2.0.0"
 notebook = ">=7.2.1,<8.0.0"
-parabellum = "0.3.3"
+parabellum = ">=0.3.4"
 tqdm = ">=4.66.5,<5.0.0"
 
 [[package]]
@@ -2223,13 +2223,13 @@ test = ["flaky", "ipyparallel", "pre-commit", "pytest (>=7.0)", "pytest-asyncio 
 
 [[package]]
 name = "ipython"
-version = "8.28.0"
+version = "8.29.0"
 description = "IPython: Productive Interactive Computing"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "ipython-8.28.0-py3-none-any.whl", hash = "sha256:530ef1e7bb693724d3cdc37287c80b07ad9b25986c007a53aa1857272dac3f35"},
-    {file = "ipython-8.28.0.tar.gz", hash = "sha256:0d0d15ca1e01faeb868ef56bc7ee5a0de5bd66885735682e8a322ae289a13d1a"},
+    {file = "ipython-8.29.0-py3-none-any.whl", hash = "sha256:0188a1bd83267192123ccea7f4a8ed0a78910535dbaa3f37671dca76ebd429c8"},
+    {file = "ipython-8.29.0.tar.gz", hash = "sha256:40b60e15b22591450eef73e40a027cf77bd652e757523eebc5bd7c7c498290eb"},
 ]
 
 [package.dependencies]
@@ -3822,13 +3822,13 @@ files = [
 
 [[package]]
 name = "parabellum"
-version = "0.3.3"
+version = "0.4.0"
 description = "Parabellum environment for parallel warfare simulation"
 optional = false
 python-versions = "<3.12,>=3.11"
 files = [
-    {file = "parabellum-0.3.3-py3-none-any.whl", hash = "sha256:dc1fc06fabed37e72228e9e0d9ecacab369fbfb378a13bf80e79c677a0f87075"},
-    {file = "parabellum-0.3.3.tar.gz", hash = "sha256:95345d5848bc2e7bd3bef3c698327f870e162a89c9ea78489020918c9af88b74"},
+    {file = "parabellum-0.4.0-py3-none-any.whl", hash = "sha256:dcae404f235cc480ea395b71b1bb8e0240c5ffdca83869cc091bc06d457e3934"},
+    {file = "parabellum-0.4.0.tar.gz", hash = "sha256:54973991e59eff42f0f659f13bd063136f7bf8971d0d489a51552441b99f7c26"},
 ]
 
 [package.dependencies]
@@ -6677,4 +6677,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "4018e05e5796b67af87dbe6c2024000aa1cbf3ba84d711eddc6cf94fcdf4b264"
+content-hash = "da877a14217c1193ace2344b6f172f7840ac3cc85f1d65438a033f40ca016cfd"

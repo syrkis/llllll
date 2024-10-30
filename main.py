@@ -1,4 +1,4 @@
-# main.py
+# %% main.py
 #   This file contains the FastAPI server that serves the Parabellum environment.
 # by: Noah Syrkis
 
@@ -136,6 +136,7 @@ async def game_loop(game: Game, websocket: WebSocket):
         new_obs, new_state, actions = game.step_fn(game.obs, game.state, key, game.assigned_bts)
         game.state = new_state
         game.terminal = new_state.terminal  # Convert to Python bool
+        game.obs = new_obs
 
         state_dict = {
             "unit_positions": new_state.unit_positions.tolist(),
@@ -245,10 +246,7 @@ async def step_game_endpoint(game_id: str):
     new_obs, new_state, actions = game.step_fn(game.obs, game.state, key, game.assigned_bts)
     game.state = new_state
     game.terminal = new_state.terminal  # Convert to Python bool
-    game.state = new_state
-    print(game.assigned_bts, actions)
-    print(game.agent_info.direction_map[0])
-    # print(jnp.logical_or(game.env.terrain.building, game.env.terrain.water))
+    game.obs = new_obs
     state_dict = {
         "unit_positions": new_state.unit_positions.tolist(),
         "unit_alive": new_state.unit_alive.tolist(),

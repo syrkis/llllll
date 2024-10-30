@@ -39,21 +39,15 @@ unit_types_set = {"soldier", "sniper", "swat", "turret", "civilian"}
 
 
 # %% Constants
-enemy_plan = f"""Step 0:
-prerequisites: []
-objective: position
-units: all
-- target position: {(50, 50)}
-- behavior: stand
-"""
+enemy_plan = ll.env.enemy_plan
 
 
 ally_plan = f"""Step 0:
 prerequisites: []
 objective: position
 units: all
-- target position: {(50, 50)}
-- behavior: ignore_enemies
+- target position: {(0, 0)}
+- behavior: stand
 """
 
 

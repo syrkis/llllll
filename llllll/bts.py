@@ -106,51 +106,51 @@ handcrafted_bts = {
         "bt": "A (follow_map toward)",
         "description": "The units follow their direction map (stand if not direction map)",
     },
-    # "Attack": {
-    # "bt": set_default(bt_attack_and_wait, "A (follow_map toward)"),
-    # "description": "The units attack all the enemies in range.",
-    # },
-    # "Attack_in_close_range": {
-    # "bt": set_default(bt_attack_and_chase, "A (follow_map toward)"),
-    # "description": "The units wait for their opponent, attack them and then move toward them.",
-    # },
-    # "Attack_in_long_range": {
-    # "bt": set_default(bt_attack_and_stay_out_of_range, "A (follow_map toward)"),
-    # "description": "Attack while keeping out of reach of the enemy.",
-    # },
-    # "Flee": {
-    # "bt": set_default(bt_flee, "A (follow_map toward)"),
-    # "description": "Move away from closest foe in sight.",
-    # },
-    # "Follow_allies": {
-    # "bt": "F (A (move toward closest foe) :: A (stand))",
-    # "description": "Move toward the closest foe in sight. (For the NPC civilians)",
-    # },
-    # "Defend": {"bt": bt_attack_and_wait, "description": "The units attack all the enemies in range without moving."},
-    # "Defend_contact": {
-    # "bt": bt_attack_and_chase,
-    # "description": "The units attack all the enemies in range without moving.",
-    # },
-    # "LR_out_of_forest": {
-    # "bt": f"F (S (C (is_in_forest) :: A (follow_map toward)) :: {bt_attack_and_stay_out_of_range})"
-    # },
-    # "SR_out_of_forest": {"bt": f"F (S (C (is_in_forest) :: A (follow_map toward)) :: {bt_attack_and_chase})"},
-    # "Test": {"bt": f"F (S (C (is_in_forest) :: A (move north)) :: A (move west))"},
+    "Attack": {
+        "bt": set_default(bt_attack_and_wait, "A (follow_map toward)"),
+        "description": "The units attack all the enemies in range.",
+    },
+    "Attack_in_close_range": {
+        "bt": set_default(bt_attack_and_chase, "A (follow_map toward)"),
+        "description": "The units wait for their opponent, attack them and then move toward them.",
+    },
+    "Attack_in_long_range": {
+        "bt": set_default(bt_attack_and_stay_out_of_range, "A (follow_map toward)"),
+        "description": "Attack while keeping out of reach of the enemy.",
+    },
+    "Flee": {
+        "bt": set_default(bt_flee, "A (follow_map toward)"),
+        "description": "Move away from closest foe in sight.",
+    },
+    "Follow_allies": {
+        "bt": "F (A (move toward closest foe) :: A (stand))",
+        "description": "Move toward the closest foe in sight. (For the NPC civilians)",
+    },
+    "Defend": {"bt": bt_attack_and_wait, "description": "The units attack all the enemies in range without moving."},
+    "Defend_contact": {
+        "bt": bt_attack_and_chase,
+        "description": "The units attack all the enemies in range without moving.",
+    },
+    "LR_out_of_forest": {
+        "bt": f"F (S (C (is_in_forest) :: A (follow_map toward)) :: {bt_attack_and_stay_out_of_range})"
+    },
+    "SR_out_of_forest": {"bt": f"F (S (C (is_in_forest) :: A (follow_map toward)) :: {bt_attack_and_chase})"},
+    "Test": {"bt": f"F (S (C (is_in_forest) :: A (move north)) :: A (move west))"},
 }
 
 LLM_BTs = {
     "stand": "Stand",
     "ignore_enemies": "Follow_map",
-    # "flee": "Flee",
-    # "attack_in_close_range": "Attack_in_close_range",
-    # "attack_static": "Attack",
-    # "attack_in_long_range": "Attack_in_long_range",
-    # "to_contact": "Follow_allies",
-    # "defend": "Defend",
-    # "defend_contact": "Defend_contact",
-    # "sr_out_of_forest": "SR_out_of_forest",
-    # "lr_out_of_forest": "LR_out_of_forest",
-    # "test": "Test",
+    "flee": "Flee",
+    "attack_in_close_range": "Attack_in_close_range",
+    "attack_static": "Attack",
+    "attack_in_long_range": "Attack_in_long_range",
+    "to_contact": "Follow_allies",
+    "defend": "Defend",
+    "defend_contact": "Defend_contact",
+    "sr_out_of_forest": "SR_out_of_forest",
+    "lr_out_of_forest": "LR_out_of_forest",
+    "test": "Test",
 }
 # -
 
