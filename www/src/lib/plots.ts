@@ -38,13 +38,12 @@ export function updateVisualization() {
 }
 
 function updateShapes(
-  svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, unknown>,
+  svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, any>,
   unitData: UnitData[],
   unitTypeInfo: Scenario["unit_type_info"],
   currentScale: d3.ScaleLinear<number, number>,
 ) {
-  const shapes = svg.selectAll<SVGPathElement, UnitData>(".shape").data(unitData, (d, i) => i.toString());
-
+  const shapes = svg.selectAll<SVGPathElement, UnitData>(".shape").data(unitData, (d: UnitData, i) => i.toString());
   // Duration of the entering and exiting transition
   const duration = 100;
 
@@ -84,9 +83,8 @@ function updateShapes(
     .exit()
     .transition()
     .duration(duration)
-    .attr("d", (d) => {
+    .attr("d", (d: UnitData) => {
       const { x, y } = getPosition(d, currentScale);
-      // Shrink to zero radius before removal
       return createUnitShape(d, x, y, 0);
     })
     .remove();
@@ -188,15 +186,32 @@ function calculateStreakPositions(agent: UnitData, target: UnitData, currentScal
     y2: end.y - offsetY,
   };
 }
+const UNIT_TYPES = {
+  CIRCLE: 0, // e.g., for ranged units
+  SQUARE: 2, // e.g., for melee units
+  TRIANGLE: 1, // e.g., for special units
+} as const;
 
-function createUnitShape(d: UnitData, x: number, y: number, radius: number) {
+function createUnitShape(d: UnitData, x: number, y: number, radius: number): string {
   switch (d.type) {
-    case 0:
-      return `M ${x},${y} m -${radius},0 a ${radius},${radius} 0 1,0 ${radius * 2},0 a ${radius},${radius} 0 1,0 -${radius * 2},0`;
-    case 1:
-      return `M ${x - radius},${y - radius} h ${radius * 2} v ${radius * 2} h -${radius * 2} z`;
-    case 2:
-      return `M ${x},${y - radius} L ${x - radius},${y + radius} L ${x + radius},${y + radius} Z`;
+    case UNIT_TYPES.CIRCLE:
+      // Circle
+      return `M ${x},${y} m -${radius},0
+              a ${radius},${radius} 0 1,0 ${radius * 2},0
+              a ${radius},${radius} 0 1,0 -${radius * 2},0`;
+
+    case UNIT_TYPES.SQUARE:
+      // Square
+      return `M ${x - radius},${y - radius}
+              h ${radius * 2} v ${radius * 2}
+              h -${radius * 2} z`;
+
+    case UNIT_TYPES.TRIANGLE:
+      // Triangle
+      return `M ${x},${y - radius}
+              L ${x - radius},${y + radius}
+              L ${x + radius},${y + radius} Z`;
+
     default:
       return "";
   }

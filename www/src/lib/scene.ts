@@ -8,10 +8,10 @@ interface TerrainCell {
 }
 
 export function createBackgroundGrid(
-  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+  svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, any>,
   terrainMatrix: number[][] | null,
   scale: d3.ScaleLinear<number, number> | null,
-  isResize = false, // Do not explicitly annotate; TypeScript infers this as boolean from the default value
+  isResize = false,
 ) {
   if (!terrainMatrix || !scale) {
     console.warn("Terrain matrix or scale is undefined");
