@@ -1,7 +1,10 @@
 // api.ts
-import type { State, Scenario, Observation } from "$lib/types";
+import type { State, Scenario, Observation, numberToTerrainType } from "$lib/types";
 
 const API_BASE_URL = "http://localhost:8000";
+
+// api.ts
+import { TerrainType, numberToTerrainType } from "$lib/types";
 
 export async function createGame(place: string): Promise<{ gameId: string; info: Scenario }> {
   const response = await fetch(`${API_BASE_URL}/games/create/${encodeURIComponent(place)}`, {
@@ -10,7 +13,14 @@ export async function createGame(place: string): Promise<{ gameId: string; info:
   if (!response.ok) {
     throw new Error(`Failed to create game: ${response.statusText}`);
   }
-  const [gameId, info] = await response.json();
+  const [gameId, rawInfo] = await response.json();
+
+  // Convert the numeric terrain to TerrainType
+  const info: Scenario = {
+    ...rawInfo,
+    terrain: rawInfo.terrain.map((row: number[]) => row.map((cell: number) => numberToTerrainType(cell))),
+  };
+
   return { gameId, info };
 }
 

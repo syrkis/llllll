@@ -41,10 +41,13 @@ def game_info_fn(env):
             "unit_type_health": env.unit_type_health,
         },
     )
-    water = (1 * env.terrain.water).T
-    trees = (2 * env.terrain.forest).T
-    walls = (3 * env.terrain.building).T
-    return {"unit_type_info": unit_type_info, "terrain": ((water + trees + walls).clip(0, 3)).tolist()}
+    water = env.terrain.water.T
+    trees = env.terrain.forest.T
+    walls = env.terrain.building.T
+    return {
+        "unit_type_info": unit_type_info,
+        "terrain": jnp.maximum(jnp.maximum(1 * water, 2 * trees), 3 * walls).tolist(),
+    }
 
 
 # %% Classes

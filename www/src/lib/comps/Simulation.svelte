@@ -4,9 +4,10 @@
     import { createBackgroundGrid } from "$lib/scene";
     import { get } from "svelte/store";
     import * as d3 from "d3";
+    import type { TerrainType } from "$lib/types";
 
     let svgElement: SVGSVGElement;
-    let initialRenderedTerrain: number[][] | null = null;
+    let initialRenderedTerrain: TerrainType[][] | null = null; // Updated to TerrainType
 
     let isDragging = false;
     let dragIndex = -1;
@@ -35,6 +36,7 @@
 
     function drawTerrain() {
         const { terrain } = get(gameStore);
+        console.log("Drawing terrain:", terrain); // Add this line
         if (terrain && $scale) {
             const svg = d3.select<SVGSVGElement, unknown>(svgElement);
             createBackgroundGrid(svg, terrain, $scale);

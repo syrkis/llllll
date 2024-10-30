@@ -1,8 +1,9 @@
 // In store.ts
 import { writable } from "svelte/store";
 import type { State, Scenario, GridData } from "$lib/types";
+import { TerrainType } from "$lib/types"; // Import TerrainType enum
 import type { ScaleLinear } from "d3-scale";
-import { emptyState } from "./types"; // import emptyState from types.ts
+import { emptyState } from "./types";
 
 export interface GameStore {
   gameId: string | null;
@@ -11,9 +12,9 @@ export interface GameStore {
   terrain: GridData | null;
 }
 
-const initialTerrain: number[][] = Array.from({ length: 100 }, (_, rowIndex) =>
+const initialTerrain: TerrainType[][] = Array.from({ length: 100 }, (_, rowIndex) =>
   Array.from({ length: 100 }, (_, colIndex) => {
-    return rowIndex % 3 === 0 && colIndex % 3 === 0 ? 2 : 0;
+    return rowIndex % 3 === 0 && colIndex % 3 === 0 ? TerrainType.Solid : TerrainType.Empty;
   }),
 );
 

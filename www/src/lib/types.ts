@@ -1,6 +1,33 @@
 // types.ts
 import type * as d3 from "d3";
 
+// Add this to your types.ts file
+// types.ts
+export enum TerrainType {
+  Empty = "empty",
+  Water = "water",
+  Trees = "trees",
+  Walls = "walls",
+  Solid = "solid",
+}
+
+// Add this function to convert from API numbers to TerrainType
+export function numberToTerrainType(value: number): TerrainType {
+  switch (value) {
+    case 0:
+      return TerrainType.Empty;
+    case 1:
+      return TerrainType.Water;
+    case 2:
+      return TerrainType.Trees;
+    case 3:
+      return TerrainType.Walls;
+    default:
+      return TerrainType.Empty;
+  }
+}
+
+// Update the Scenario interface
 export interface Scenario {
   unit_type_info: {
     unit_type_attack_ranges: number[];
@@ -8,8 +35,11 @@ export interface Scenario {
     unit_type_radiuses: number[];
     unit_type_health: number[];
   };
-  terrain: number[][]; // Update to use a unified terrain matrix
+  terrain: TerrainType[][]; // Now uses TerrainType instead of number[][]
 }
+
+// Update GridData type
+export type GridData = TerrainType[][];
 
 export const emptyState: State = {
   unit_positions: [],
@@ -49,16 +79,6 @@ export interface UnitData {
   maxHealth: number;
   attack: number;
 }
-
-// Removed the old separate terrain types
-// Use a single terrain matrix instead
-/* export type GridData = {
-  water: boolean[][];
-  walls: boolean[][];
-  trees: boolean[][];
-}; */
-
-export type GridData = number[][]; // Unified grid data for terrain types
 
 export type SVGSelection = d3.Selection<SVGSVGElement, unknown, null, undefined>;
 
