@@ -3,51 +3,28 @@
 # by: Noah Syrkis
 
 # %% Imports
-import uuid
 import asyncio
-import time
-import json
-import llllll as ll
-from dataclasses import field
+import uuid
+from typing import Dict, List, Optional
 
-
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
-from jax import random, jit, vmap, lax, tree_util
 import jax.numpy as jnp
 import parabellum as pb
-from jax_tqdm import scan_tqdm
-from functools import partial
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from jax import random, tree_util
+from pydantic import BaseModel
+
+import llllll as ll
+
 
 # %% FastAPI server
+games = {}
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
 )
-games = {}
 sleep_time = 0.1
-
-
-def game_info_fn(env):
-    unit_type_info = tree_util.tree_map(
-        lambda x: x.tolist(),
-        {
-            "unit_type_attack_ranges": env.unit_type_attack_ranges,
-            "unit_type_sight_ranges": env.unit_type_sight_ranges,
-            "unit_type_radiuses": env.unit_type_radiuses,
-            "unit_type_health": env.unit_type_health,
-        },
-    )
-    water = env.terrain.water.T
-    trees = env.terrain.forest.T
-    walls = env.terrain.building.T
-    return {
-        "unit_type_info": unit_type_info,
-        "terrain": jnp.maximum(jnp.maximum(1 * water, 2 * trees), 3 * walls).tolist(),
-    }
 
 
 # %% Classes
@@ -104,7 +81,27 @@ class Game:
         # self.step_fn = jit(env.step)
 
 
-# %% Routes
+# %% Functions
+def game_info_fn(env):
+    unit_type_info = tree_util.tree_map(
+        lambda x: x.tolist(),
+        {
+            "unit_type_attack_ranges": env.unit_type_attack_ranges,
+            "unit_type_sight_ranges": env.unit_type_sight_ranges,
+            "unit_type_radiuses": env.unit_type_radiuses,
+            "unit_type_health": env.unit_type_health,
+        },
+    )
+    water = env.terrain.water.T
+    trees = env.terrain.forest.T
+    walls = env.terrain.building.T
+    return {
+        "unit_type_info": unit_type_info,
+        "terrain": jnp.maximum(jnp.maximum(1 * water, 2 * trees), 3 * walls).tolist(),
+    }
+
+
+# %% Routes ####################################################################
 @app.post("/games/create/{place}")
 async def game_create(place):
     game_id = str(uuid.uuid4())
