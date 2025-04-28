@@ -2,7 +2,7 @@
     import { onMount } from "svelte";
     import { init, reset, step, close } from "../lib/api";
     import { API_BASE_URL } from "../lib/utils";
-    import type { State } from "../lib/types";
+    import type { State, Unit } from "../lib/types";
 
     // Define types for our app state
     interface LogEntry {
@@ -10,16 +10,98 @@
         message: string;
     }
 
-    // Game state using Svelte 5 runes
-    let gameId = $state("");
+    interface Message {
+        text: string;
+        user: "person" | "system";
+    }
+
+    // Convert messages to use $state for reactivity
+    let messages = $state<Message[]>([
+        {
+            text: "Welcome! Type '| help' for available commands.",
+            user: "system",
+        },
+    ]);
+    let gameId = $state<string | null>(null);
     let gameState = $state<State | null>(null);
     let logs = $state<LogEntry[]>([]);
-    let loading = $state(false);
     let error = $state<string | null>(null);
+    let loading = $state(false);
 
     // Log function to track API calls and results
     function addLog(message: string): void {
         logs = [...logs, { time: new Date().toLocaleTimeString(), message }];
+    }
+
+    function addMessage(message: Message): void {
+        messages = [...messages, message];
+    }
+
+    // Handles command processing for commands starting with |
+    async function processCommand(command: string): Promise<void> {
+        // Remove the leading | and trim whitespace
+        const cmd = command.substring(1).trim().toLowerCase();
+
+        switch (cmd) {
+            case "init":
+                await initGame();
+                addMessage({ text: "Game initialized", user: "system" });
+                break;
+            case "reset":
+                await resetGame();
+                addMessage({ text: "Game reset", user: "system" });
+                break;
+            case "step":
+                await stepGame();
+                addMessage({ text: "Game stepped", user: "system" });
+                break;
+            case "close":
+                await closeGame();
+                addMessage({ text: "Game closed", user: "system" });
+                break;
+            case "help":
+                addMessage({
+                    text:
+                        "Available commands:\n" +
+                        "| init - Initialize new game\n" +
+                        "| reset - Reset current game\n" +
+                        "| step - Advance game state\n" +
+                        "| close - Close current game\n" +
+                        "| help - Show available commands",
+                    user: "system",
+                });
+                break;
+            default:
+                addMessage({
+                    text: `Unknown command: '${cmd}'. Type '| help' for available commands.`,
+                    user: "system",
+                });
+        }
+    }
+
+    // Handle form submission
+    async function handleSubmit(event: SubmitEvent): void {
+        event.preventDefault();
+        const messageInput = document.getElementById(
+            "messageInput",
+        ) as HTMLInputElement;
+        const messageText = messageInput.value.trim();
+
+        if (messageText) {
+            // Add the message to the chat
+            addMessage({
+                text: messageText,
+                user: "person",
+            });
+
+            // Check if this is a command (starts with |)
+            if (messageText.startsWith("|")) {
+                await processCommand(messageText);
+            }
+
+            // Clear the input field
+            messageInput.value = "";
+        }
     }
 
     // Initialize a new game
@@ -44,6 +126,10 @@
     async function resetGame(): Promise<void> {
         if (!gameId) {
             addLog("No game to reset. Initialize a game first.");
+            addMessage({
+                text: "No game to reset. Initialize a game first with '| init'.",
+                user: "system",
+            });
             return;
         }
 
@@ -67,6 +153,10 @@
     async function stepGame(): Promise<void> {
         if (!gameId) {
             addLog("No game to step. Initialize and reset a game first.");
+            addMessage({
+                text: "No game to step. Initialize a game first with '| init'.",
+                user: "system",
+            });
             return;
         }
 
@@ -79,7 +169,7 @@
 
             // Log number of units
             if (gameState.units && gameState.units.length > 0) {
-                addLog(`Units in game: ${gameState.units[0].length}`);
+                addLog(`Units in game: ${gameState.units.length}`);
             }
         } catch (err: unknown) {
             const errorMessage =
@@ -95,6 +185,7 @@
     async function closeGame(): Promise<void> {
         if (!gameId) {
             addLog("No game to close.");
+            addMessage({ text: "No game to close.", user: "system" });
             return;
         }
 
@@ -104,7 +195,7 @@
             addLog(`Closing game ${gameId}...`);
             await close(gameId);
             addLog("Game closed successfully.");
-            gameId = "";
+            gameId = null;
             gameState = null;
         } catch (err: unknown) {
             const errorMessage =
@@ -123,13 +214,6 @@
 </script>
 
 <main class="container">
-    <div id="simulator"></div>
-    {#if gameId}
-        {#each [1, 2, 3] as index}
-            <div>{gameId}</div>
-        {/each}
-    {/if}
-
     {#if error}
         <div class="error">
             <strong>Error:</strong>
@@ -137,45 +221,39 @@
         </div>
     {/if}
 
-    <div class="game-controls">
-        <h2>Game Controls</h2>
-        <div class="button-group">
-            <button onclick={initGame} disabled={loading}
-                >Initialize Game</button
-            >
-            <button onclick={resetGame} disabled={loading || !gameId}
-                >Reset Game</button
-            >
-            <button onclick={stepGame} disabled={loading || !gameId}
-                >Step Game</button
-            >
-            <button onclick={closeGame} disabled={loading || !gameId}
-                >Close Game</button
-            >
-        </div>
+    <div id="simulator">
+        {#if gameState != null}
+            {$inspect(gameState)}
+            {#each gameState.units as unit}
+                <div>{unit.x}, {unit.y}</div>
+            {/each}
+        {/if}
     </div>
 
-    {#if gameId}
-        <div class="game-info">
-            <h2>Game Information</h2>
-            <p><strong>Game ID:</strong> {gameId}</p>
-
-            {#if gameState}
-                <div class="state-info">
-                    <h3>Game State</h3>
-                    <p><strong>Current Step:</strong> {gameState.step}</p>
-                    <p>
-                        <strong>Units Count:</strong>
-                        {gameState.units?.[0]?.length || 0}
-                    </p>
-                </div>
+    <div id="controler">
+        <!-- chat history -->
+        {#each messages as message}
+            {#if message.user === "system"}
+                <div class="system">{message.text}</div>
+            {:else}
+                <div class="person">{message.text}</div>
             {/if}
-        </div>
-    {/if}
+        {/each}
 
-    <div class="logs">
-        <h2>Logs</h2>
-        <div class="log-container">
+        <!-- chat input -->
+        <form onsubmit={handleSubmit}>
+            <div class="input-container">
+                <input
+                    type="text"
+                    id="messageInput"
+                    placeholder="Type message or command (| init, | reset, | step, | close)"
+                    required
+                />
+            </div>
+        </form>
+
+        <!-- log history -->
+        <div class="log-history">
             {#each logs as log}
                 <div class="log-entry">
                     <span class="log-time">[{log.time}]</span>
@@ -187,11 +265,69 @@
 </main>
 
 <style>
+    .system,
+    .person {
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        border-radius: 0.25rem;
+        max-width: 80%;
+        white-space: pre-wrap;
+    }
+
+    .system {
+        background-color: #f0f0f0;
+        align-self: flex-start;
+    }
+
+    .person {
+        background-color: #e0f0ff;
+        align-self: flex-end;
+        margin-left: auto;
+    }
+
+    /* Container for messages */
+    #controler {
+        display: flex;
+        flex-direction: column;
+        /* keep your existing styles for #controler here */
+    }
+
+    /* Optional: Add some style to the input container */
+    .input-container {
+        display: flex;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .input-container input {
+        flex-grow: 1;
+        padding: 0.5rem;
+        border-radius: 4px 0 0 4px;
+        border: 1px solid #ccc;
+    }
+
     .container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 1rem;
+        width: 100%;
+        height: 100vh; /* Full viewport height */
+        display: flex; /* Create a flex container for columns */
         font-family: sans-serif;
+        overflow: hidden; /* Prevent scrolling */
+    }
+
+    #simulator {
+        height: 100%; /* Full height */
+        aspect-ratio: 1/1; /* Keep it square */
+        border: 1px solid; /* Add a border */
+        /* background-color: #f0f0f0; /* Optional: just to visualize */
+    }
+
+    #controler {
+        flex: 1; /* Take up remaining space */
+        height: 100%; /* Full height */
+        overflow-y: auto; /* Allow scrolling if content overflows */
+        padding: 10px; /* Optional: add some padding */
+        border: 1px solid; /* Add a border */
+        /* background-color: #e0e0e0; /* Optional: just to visualize */
     }
 
     .error {
@@ -199,46 +335,6 @@
         /* color: #990000; */
         padding: 0.5rem;
         margin: 1rem 0;
-        border-radius: 4px;
-    }
-
-    .button-group {
-        display: flex;
-        gap: 0.5rem;
-        margin-bottom: 1rem;
-    }
-
-    button {
-        padding: 0.5rem 1rem;
-        border: none;
-        /* background-color: #4a4a4a; */
-        /* color: white; */
-        border-radius: 4px;
-        cursor: pointer;
-    }
-
-    button:hover:not(:disabled) {
-        background-color: #5a5a5a;
-    }
-
-    button:disabled {
-        background-color: #cccccc;
-        cursor: not-allowed;
-    }
-
-    .game-info,
-    .game-controls {
-        /* background-color: #f3f3f3; */
-        padding: 1rem;
-        border-radius: 4px;
-        margin-bottom: 1rem;
-    }
-
-    .log-container {
-        height: 300px;
-        overflow-y: auto;
-        /* background-color: #888; */
-        padding: 0.5rem;
         border-radius: 4px;
     }
 
@@ -255,9 +351,5 @@
 
     .log-message {
         word-break: break-word;
-    }
-
-    .state-info {
-        margin-top: 1rem;
     }
 </style>
