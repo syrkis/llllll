@@ -121,17 +121,19 @@ interface BackendState {
  * @param rawState - The raw state from the API
  * @returns Processed units array matching the frontend types
  */
-function processUnitData(rawState: BackendState): Unit[][] {
+function processUnitData(rawState: BackendState): Unit[] {
     // If no unit data is available, return an empty array
-    if (!rawState.unit_position || !rawState.unit_health) {
+    console.log("noahnoahnoahnoah");
+    if (!rawState.coords || !rawState.health) {
+        console.log("XXXXXXX");
         return [];
     }
 
     // The backend sends unit_position, unit_health, and unit_cooldown as arrays
     // We need to transform them into our Unit type structure
-    const unitPositions = rawState.unit_position;
-    const unitHealth = rawState.unit_health || [];
-    const unitCooldown = rawState.unit_cooldown || [];
+    const unitPositions = rawState.coords;
+    const unitHealth = rawState.health;
+    // const unitCooldown = rawState.unit_cooldown || [];
 
     // Group units by team or other criteria (this will depend on how your data is structured)
     // For now, we'll assume all units are in one group
@@ -140,21 +142,20 @@ function processUnitData(rawState: BackendState): Unit[][] {
     // Process unit data - exact structure depends on how unit_position is formatted
     // This is a basic implementation that assumes unit_position is a flat array of [x1, y1, x2, y2, ...]
     if (Array.isArray(unitPositions) && unitPositions.length >= 2) {
-        for (let i = 0; i < unitPositions.length; i += 2) {
-            const unitIndex = i / 2;
+        for (let i = 0; i < unitPositions.length; i++) {
             units.push({
-                id: unitIndex,
-                x: unitPositions[i],
-                y: unitPositions[i + 1],
+                id: i,
+                x: unitPositions[i][0],
+                y: unitPositions[i][1],
                 size: 1, // Default size if not provided
-                health: unitHealth[unitIndex] || 100, // Default health if not provided
+                health: 100, // Default health if not provided
                 type: "unit" as UnitType, // Default type
             });
         }
     }
 
     // Return units grouped as required by the frontend State type
-    return [units]; // Wrap in array to match the units: Unit[][] type
+    return units; // Wrap in array to match the units: Unit[][] type
 }
 
 /**

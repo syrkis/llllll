@@ -80,7 +80,7 @@
     }
 
     // Handle form submission
-    async function handleSubmit(event: SubmitEvent): void {
+    async function handleSubmit(event: SubmitEvent): Promise<void> {
         event.preventDefault();
         const messageInput = document.getElementById(
             "messageInput",
@@ -289,7 +289,6 @@
     #controler {
         display: flex;
         flex-direction: column;
-        /* keep your existing styles for #controler here */
     }
 
     /* Optional: Add some style to the input container */
