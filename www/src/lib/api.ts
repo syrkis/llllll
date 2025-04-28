@@ -1,102 +1,180 @@
-// api.ts
-import type { State, Scenario, Observation, numberToTerrainType } from "$lib/types";
+import type { State, Unit, UnitType } from "./types";
+import { API_BASE_URL, convertTerrain, parseState } from "./utils";
 
-const API_BASE_URL = "http://localhost:8000";
+/**
+ * Creates a new game based on a location
+ * @param place - The location name (e.g., "Copenhagen, Denmark")
+ * @returns Promise with the game_id
+ */
+export async function init(place: string): Promise<string> {
+    try {
+        // URL encode the place parameter
+        const encodedPlace = encodeURIComponent(place);
 
-// api.ts
-import { TerrainType, numberToTerrainType } from "$lib/types";
+        // Make the API call to the init endpoint
+        const response = await fetch(`${API_BASE_URL}/init/${encodedPlace}`);
 
-export async function createGame(place: string): Promise<{ gameId: string; info: Scenario }> {
-  const response = await fetch(`${API_BASE_URL}/games/create/${encodeURIComponent(place)}`, {
-    method: "POST",
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to create game: ${response.statusText}`);
-  }
-  const [gameId, rawInfo] = await response.json();
+        if (!response.ok) {
+            throw new Error(
+                `Failed to initialize game: ${response.statusText}`,
+            );
+        }
 
-  // Convert the numeric terrain to TerrainType
-  const info: Scenario = {
-    ...rawInfo,
-    terrain: rawInfo.terrain.map((row: number[]) => row.map((cell: number) => numberToTerrainType(cell))),
-  };
-
-  return { gameId, info };
+        const data = await response.json();
+        console.log(data);
+        return data.game_id;
+    } catch (error) {
+        console.error("Error initializing game:", error);
+        throw error;
+    }
 }
 
-export async function resetGame(gameId: string): Promise<{ obs: Observation; state: State }> {
-  const response = await fetch(`${API_BASE_URL}/games/${gameId}/reset`, {
-    method: "POST",
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to reset game: ${response.statusText}`);
-  }
-  return await response.json();
+/**
+ * Resets a game with the given game_id
+ * @param game_id - The ID of the game to reset
+ * @returns Promise with the game state
+ */
+export async function reset(game_id: string): Promise<State> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/reset/${game_id}`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to reset game: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        // Process the state data according to the Python types.py structure
+        // The backend uses State with unit_position, unit_health, unit_cooldown
+        // We need to transform this to match our frontend State type
+        const rawState = data.state as BackendState;
+
+        if (!rawState) {
+            throw new Error("No state data returned from the server");
+        }
+
+        // Parse the raw state coming from Python/FastAPI to match our TypeScript types
+        return {
+            units: processUnitData(rawState),
+            step: rawState.step || 0,
+            pos: Array.isArray(rawState.unit_position)
+                ? rawState.unit_position
+                : [],
+        };
+    } catch (error) {
+        console.error("Error resetting game:", error);
+        throw error;
+    }
 }
 
-export async function startGame(gameId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/games/${gameId}/start`, {
-    method: "POST",
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to start game: ${response.statusText}`);
-  }
-  const result = await response.json();
-  if (result.error) {
-    throw new Error(`Failed to start game: ${result.error}`);
-  }
+/**
+ * Steps the game forward for the given game_id
+ * @param game_id - The ID of the game to step
+ * @returns Promise with the updated game state
+ */
+export async function step(game_id: string): Promise<State> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/step/${game_id}`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to step game: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        // Process the state data according to the Python types.py structure
+        const rawState = data.state as BackendState;
+
+        if (!rawState) {
+            throw new Error("No state data returned from the server");
+        }
+
+        // Parse the raw state coming from Python/FastAPI to match our TypeScript types
+        console.log(rawState);
+        return {
+            units: processUnitData(rawState),
+            step: rawState.step || 0,
+            pos: Array.isArray(rawState.unit_position)
+                ? rawState.unit_position
+                : [],
+        };
+    } catch (error) {
+        console.error("Error stepping game:", error);
+        throw error;
+    }
 }
 
-export async function pauseGame(gameId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/games/${gameId}/pause`, {
-    method: "POST",
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to pause game: ${response.statusText}`);
-  }
-  const result = await response.json();
-  if (result.error) {
-    throw new Error(`Failed to pause game: ${result.error}`);
-  }
+/**
+ * Interface representing raw state data from the API
+ * This matches the Python State dataclass in types.py
+ */
+interface BackendState {
+    unit_position?: number[];
+    unit_health?: number[];
+    unit_cooldown?: number[];
+    step?: number;
+    [key: string]: unknown;
 }
 
-export async function stepGame(gameId: string): Promise<State> {
-  const response = await fetch(`${API_BASE_URL}/games/${gameId}/step`, {
-    method: "POST",
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to step game: ${response.statusText}`);
-  }
-  const result = await response.json();
-  return result.state;
+/**
+ * Process unit data from the API response
+ * @param rawState - The raw state from the API
+ * @returns Processed units array matching the frontend types
+ */
+function processUnitData(rawState: BackendState): Unit[][] {
+    // If no unit data is available, return an empty array
+    if (!rawState.unit_position || !rawState.unit_health) {
+        return [];
+    }
+
+    // The backend sends unit_position, unit_health, and unit_cooldown as arrays
+    // We need to transform them into our Unit type structure
+    const unitPositions = rawState.unit_position;
+    const unitHealth = rawState.unit_health || [];
+    const unitCooldown = rawState.unit_cooldown || [];
+
+    // Group units by team or other criteria (this will depend on how your data is structured)
+    // For now, we'll assume all units are in one group
+    const units: Unit[] = [];
+
+    // Process unit data - exact structure depends on how unit_position is formatted
+    // This is a basic implementation that assumes unit_position is a flat array of [x1, y1, x2, y2, ...]
+    if (Array.isArray(unitPositions) && unitPositions.length >= 2) {
+        for (let i = 0; i < unitPositions.length; i += 2) {
+            const unitIndex = i / 2;
+            units.push({
+                id: unitIndex,
+                x: unitPositions[i],
+                y: unitPositions[i + 1],
+                size: 1, // Default size if not provided
+                health: unitHealth[unitIndex] || 100, // Default health if not provided
+                type: "unit" as UnitType, // Default type
+            });
+        }
+    }
+
+    // Return units grouped as required by the frontend State type
+    return [units]; // Wrap in array to match the units: Unit[][] type
 }
 
-export async function quitGame(gameId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/games/${gameId}/quit`, {
-    method: "POST",
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to quit game: ${response.statusText}`);
-  }
-}
+/**
+ * Closes a game with the given game_id
+ * @param game_id - The ID of the game to close
+ * @returns Promise that resolves when the game is closed
+ */
+export async function close(game_id: string): Promise<void> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/close/${game_id}`, {
+            method: "POST",
+        });
 
-// In api.ts
-export async function sendMessage(gameId: string, message: string): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/games/${gameId}/process-message`, {
-    // Updated URL
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      message: message,
-    }), // Only send message in body
-  });
+        if (!response.ok) {
+            throw new Error(`Failed to close game: ${response.statusText}`);
+        }
 
-  if (!response.ok) {
-    throw new Error(`Failed to process message: ${response.statusText}`);
-  }
-
-  const result = await response.json();
-  return result.response;
+        // No data processing needed for close operation
+    } catch (error) {
+        console.error("Error closing game:", error);
+        throw error;
+    }
 }

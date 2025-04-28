@@ -1,14 +1,47 @@
-# Test assigning a cookie
-GET http://localhost:8000/assign_cookie
+# Test initializing a game with a location
+GET http://localhost:8000/init/Copenhagen,%20Denmark
 HTTP 200
 [Asserts]
-header "Set-Cookie" exists
-jsonpath "$.session_id" exists
+jsonpath "$.game_id" exists
 [Captures]
-session_id: header "Set-Cookie" regex "session_id=([^;]+)"
+game_id: jsonpath "$.game_id"
 
-# Test starting a game
-POST http://localhost:8000/start_game
-Cookie: session_id={{session_id}}
-{ "scenario" : "2s3z" }
+# Test resetting a game
+GET http://localhost:8000/reset/{{game_id}}
+HTTP 200
+[Asserts]
+jsonpath "$.state" exists
+
+# Test stepping through the game
+GET http://localhost:8000/step/{{game_id}}
+HTTP 200
+[Asserts]
+jsonpath "$.state" exists
+
+# Test stepping through the game again
+GET http://localhost:8000/step/{{game_id}}
+HTTP 200
+[Asserts]
+jsonpath "$.state" exists
+
+# Test closing the game
+POST http://localhost:8000/close/{{game_id}}
+HTTP 200
+
+# Test with a different location
+GET http://localhost:8000/init/New%20York,%20USA
+HTTP 200
+[Asserts]
+jsonpath "$.game_id" exists
+[Captures]
+game_id2: jsonpath "$.game_id"
+
+# Test resetting the second game
+GET http://localhost:8000/reset/{{game_id2}}
+HTTP 200
+[Asserts]
+jsonpath "$.state" exists
+
+# Test closing the second game
+POST http://localhost:8000/close/{{game_id2}}
 HTTP 200

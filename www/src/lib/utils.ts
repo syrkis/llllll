@@ -1,45 +1,104 @@
-import { viewportHeight, gameStore, scale } from "$lib/store";
-import { get } from "svelte/store";
-import * as d3 from "d3";
-import { updateVisualization } from "$lib/plots";
+import type { CellType, Cell, Unit, RawState, State } from "./types";
+export const API_BASE_URL = "http://localhost:8000";
 
-let resizeTimeout: ReturnType<typeof setTimeout>;
+/**
+ * Creates a complete API URL by combining the base URL with an endpoint
+ * @param endpoint The API endpoint path
+ */
+export function getApiUrl(endpoint: string): string {
+    return `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+}
+/**
+ * Makes an API request and returns the response data
+ * @param endpoint The API endpoint path (without base URL)
+ * @param method The HTTP method to use
+ * @param body Optional request body (will be JSON stringified)
+ * @returns The parsed JSON response
+ */
+export async function apiRequest<T>(
+    endpoint: string,
+    method = "GET",
+    body?: Record<string, unknown>,
+): Promise<T> {
+    const url = getApiUrl(endpoint);
+    const options: RequestInit = { method };
 
-export function handleResize() {
-  if (typeof window !== "undefined") {
-    clearTimeout(resizeTimeout);
+    if (body) {
+        options.headers = {
+            "Content-Type": "application/json",
+        };
+        options.body = JSON.stringify(body);
+    }
 
-    resizeTimeout = setTimeout(() => {
-      const newVh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0) * 0.96;
-      viewportHeight.set(newVh);
+    const response = await fetch(url, options);
 
-      const { gameInfo } = get(gameStore);
-      console.log("Current GameInfo:", gameInfo);
-      if (!gameInfo || !gameInfo.terrain) {
-        console.warn("GameInfo or terrain data is missing");
-        return;
-      }
+    if (!response.ok) {
+        throw new Error(
+            `API error (${response.status}): ${response.statusText}`,
+        );
+    }
 
-      const gridSize = gameInfo.terrain.length;
-      const newScale = d3.scaleLinear().domain([0, gridSize]).range([0, newVh]);
+    const result = await response.json();
 
-      const currentScale = get(scale);
-      const terrain = get(gameStore).terrain;
-      // Compare domain and range instead of the scale itself for accuracy
-      if (!currentScale || !areScalesEqual(currentScale, newScale)) {
-        scale.set(newScale);
-        updateVisualization();
-      }
-    }, 200); // Debounce time is set to 200ms
-  }
+    // Check for application-level errors
+    if (
+        result &&
+        typeof result === "object" &&
+        "error" in result &&
+        result.error
+    ) {
+        throw new Error(`API error: ${result.error}`);
+    }
+
+    return result;
 }
 
-// Helper function to compare scales
-function areScalesEqual(scale1: d3.ScaleLinear<number, number>, scale2: d3.ScaleLinear<number, number>): boolean {
-  return (
-    scale1.domain()[0] === scale2.domain()[0] &&
-    scale1.domain()[1] === scale2.domain()[1] &&
-    scale1.range()[0] === scale2.range()[0] &&
-    scale1.range()[1] === scale2.range()[1]
-  );
+/**
+ * Maps terrain data from numerical values to cell objects
+ */
+export function convertTerrain(rawTerrain: number[][]): Cell[][] {
+    const terrainMap: Record<number, CellType> = {
+        0: "water",
+        1: "grass",
+        2: "mountain",
+    };
+
+    return rawTerrain.map((row, y) =>
+        row.map((value, x) => ({
+            x,
+            y,
+            type: terrainMap[value] || "grass",
+        })),
+    );
+}
+
+/**
+ * Converts raw unit position data to Unit objects
+ */
+export function convertUnits(rawPositions: number[]): Unit[][] {
+    // This would need to be implemented based on the actual data format
+    return rawPositions.map((row, y) =>
+        Array.isArray(row)
+            ? row.map((unit, x) => ({
+                  id: unit.id || Math.floor(Math.random() * 1000),
+                  x,
+                  y,
+                  size: unit.size || 1,
+                  health: unit.health || 100,
+                  type: unit.type || "unit",
+              }))
+            : [],
+    );
+}
+
+/**
+ * Transforms raw state data into the application State format
+ */
+export function parseState(rawState: RawState): State {
+    const units = convertUnits(rawState.unit_positions);
+    return {
+        units,
+        pos: rawState.unit_positions,
+        step: rawState.step,
+    };
 }
