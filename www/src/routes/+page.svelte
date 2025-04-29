@@ -9,13 +9,17 @@
     // Convert messages to use $state for reactivity
     let messages = $state<ChatEntry[]>([
         {
-            text: "Welcome! Type '| help' for available commands.",
+            text: "Welcome! Type '| help' to see available commands and shortcuts.",
             user: "system",
         },
     ]);
     let gameId = $state<string | null>(null);
     let gameState = $state<State | null>(null);
-    let scene = $state<Scene | null>(null);
+    let scene = $state<Scene>({
+        terrain: Array(100)
+            .fill(0)
+            .map(() => Array(100).fill(0)),
+    });
     let logs = $state<LogEntry[]>([]);
     let error = $state<string | null>(null);
     let loading = $state(false);
@@ -62,21 +66,23 @@
         switch (cmd) {
             case "init":
                 await initGame();
-                addMessage({ text: "Game initialized", user: "system" });
+                // Log to logs but don't add to messages
+                addLog("Game initialized");
                 break;
             case "reset":
                 await resetGame();
-                addMessage({ text: "Game reset", user: "system" });
+                addLog("Game reset");
                 break;
             case "step":
                 await stepGame();
-                addMessage({ text: "Game stepped", user: "system" });
+                addLog("Game stepped");
                 break;
             case "close":
                 await closeGame();
-                addMessage({ text: "Game closed", user: "system" });
+                addLog("Game closed");
                 break;
             case "help":
+                // Help is an exception - we do want to show this in the dialog
                 addMessage({
                     text:
                         "Available commands:\n" +
@@ -92,10 +98,10 @@
                 });
                 break;
             default:
-                addMessage({
-                    text: `Unknown command: '${cmdRaw}'. Type '| help' for available commands.`,
-                    user: "system",
-                });
+                // Log unknown command to logs, not messages
+                addLog(
+                    `Unknown command: '${cmdRaw}'. Type '| help' for available commands.`,
+                );
         }
     }
 
@@ -122,33 +128,26 @@
         ) as HTMLInputElement;
         const messageText = messageInput.value.trim();
 
-        // If empty message, run step command
+        // If empty message, run step command silently
         if (!messageText) {
-            addMessage({
-                text: "| step",
-                user: "person",
-            });
             await stepGame();
-            addMessage({ text: "Game stepped", user: "system" });
             return;
         }
 
-        // Add the message to the chat
-        addMessage({
-            text: messageText,
-            user: "person",
-        });
-
-        // If command, add to history
+        // If command (starts with |), add to history but don't show in chat
         if (messageText.startsWith("|")) {
             // Add to command history
             commandHistory = [...commandHistory, messageText];
             historyIndex = -1;
-        }
 
-        // Check if this is a command (starts with |)
-        if (messageText.startsWith("|")) {
+            // Process the command(s)
             await processCommands(messageText);
+        } else {
+            // If it's not a command, add it to the chat as a regular message
+            addMessage({
+                text: messageText,
+                user: "person",
+            });
         }
 
         // Clear the input field
@@ -169,6 +168,10 @@
             addLog(
                 `Terrain data received: ${scene.terrain ? scene.terrain.length : 0} buildings`,
             );
+            // Add more detailed logs instead of system messages
+            addLog(
+                `Terrain loaded for Copenhagen, Denmark. Use '| reset' to prepare the game.`,
+            );
         } catch (err: unknown) {
             const errorMessage =
                 err instanceof Error ? err.message : String(err);
@@ -182,11 +185,7 @@
     // Reset the current game
     async function resetGame(): Promise<void> {
         if (!gameId) {
-            addLog("No game to reset. Initialize a game first.");
-            addMessage({
-                text: "No game to reset. Initialize a game first with '| init'.",
-                user: "system",
-            });
+            addLog("No game to reset. Initialize a game first with '| init'.");
             return;
         }
 
@@ -196,6 +195,11 @@
             addLog(`Resetting game ${gameId}...`);
             gameState = await reset(gameId);
             addLog(`Game reset. Current step: ${gameState.step}`);
+
+            // Add more detailed logs instead of system messages
+            addLog(
+                `Units placed on the map. Use '| step' or press Enter to advance the simulation.`,
+            );
         } catch (err: unknown) {
             const errorMessage =
                 err instanceof Error ? err.message : String(err);
@@ -209,11 +213,9 @@
     // Advance the game state
     async function stepGame(): Promise<void> {
         if (!gameId) {
-            addLog("No game to step. Initialize and reset a game first.");
-            addMessage({
-                text: "No game to step. Initialize a game first with '| init'.",
-                user: "system",
-            });
+            addLog(
+                "No game to step. Initialize and reset a game first with '| init'.",
+            );
             return;
         }
 
@@ -225,9 +227,15 @@
             addLog(`Game stepped. Current step: ${gameState.step}`);
 
             // Log number of units
+            let unitCount = 0;
             if (gameState.unit && gameState.unit.length > 0) {
-                addLog(`Units in game: ${gameState.unit.length}`);
+                unitCount = gameState.unit.length;
+                addLog(`Units in game: ${unitCount}`);
             }
+
+            addLog(
+                `Step ${gameState.step} completed. ${unitCount} units active.`,
+            );
         } catch (err: unknown) {
             const errorMessage =
                 err instanceof Error ? err.message : String(err);
@@ -242,19 +250,28 @@
     async function closeGame(): Promise<void> {
         if (!gameId) {
             addLog("No game to close.");
-            addMessage({ text: "No game to close.", user: "system" });
             return;
         }
 
         loading = true;
         error = null;
         try {
-            addLog(`Closing game ${gameId}...`);
-            await close(gameId);
+            const currentGameId = gameId;
+            addLog(`Closing game ${currentGameId}...`);
+            await close(currentGameId);
             addLog("Game closed successfully.");
             gameId = null;
             gameState = null;
-            scene = null;
+            scene = {
+                terrain: Array(100)
+                    .fill(0)
+                    .map(() => Array(100).fill(0)),
+            };
+
+            // Add informative log instead of system message
+            addLog(
+                `Game ${currentGameId.substring(0, 8)}... closed successfully. Use '| init' to start a new game.`,
+            );
         } catch (err: unknown) {
             const errorMessage =
                 err instanceof Error ? err.message : String(err);
@@ -298,21 +315,58 @@
         }
     }
 
-    // Auto-add space after vertical bar
+    // Auto-add spaces before and after vertical bar
     function handleInput(event: Event): void {
         const input = event.target as HTMLInputElement;
         const value = input.value;
         const selectionStart = input.selectionStart || 0;
-
-        if (
-            value.endsWith("|") &&
-            (value.length === 1 || value[value.length - 2] !== "|")
-        ) {
-            // Add a space after the vertical bar
-            input.value = `${value} `;
-            // Position cursor after the inserted space
+        
+        // Only process if the bar character was just typed (cursor position right after a bar)
+        const barJustTyped = 
+            selectionStart > 0 && 
+            value.charAt(selectionStart - 1) === '|';
+            
+        if (barJustTyped) {
+            let originalPosition = selectionStart;
+            let newValue = value;
+            let finalCursorPosition;
+            
+            // Check if we need to add space before the bar (not at start and no space before)
+            let addSpaceBefore = false;
+            if (originalPosition > 1 && value.charAt(originalPosition - 2) !== ' ') {
+                addSpaceBefore = true;
+            }
+            
+            // Always add space after bar
+            newValue = 
+                value.substring(0, originalPosition) + 
+                ' ' + 
+                value.substring(originalPosition);
+                
+            // Add space before if needed
+            if (addSpaceBefore) {
+                // Calculate position of bar after adding the space after
+                const barPosAfterFirstMod = originalPosition;
+                
+                // Insert space before the bar
+                newValue = 
+                    newValue.substring(0, barPosAfterFirstMod - 1) + 
+                    ' ' + 
+                    newValue.substring(barPosAfterFirstMod - 1);
+                    
+                // Final cursor position will be after the bar and the space we added
+                finalCursorPosition = originalPosition + 2; // +1 for space before, +1 for space after
+            } else {
+                // No space before needed, cursor will be after bar and the space
+                finalCursorPosition = originalPosition + 1; // +1 for space after
+            }
+            
+            // Update the input value
+            input.value = newValue;
+            
+            // Position cursor correctly
             setTimeout(() => {
-                input.selectionStart = input.selectionEnd = selectionStart + 1;
+                input.selectionStart = input.selectionEnd = finalCursorPosition;
             }, 0);
         }
     }
@@ -320,11 +374,6 @@
     // Display API Base URL for debugging
     onMount(() => {
         addLog(`API Base URL: ${API_BASE_URL}`);
-        // Update help message to include shortcuts
-        addMessage({
-            text: "Welcome! Type '| h' for available commands and shortcuts.",
-            user: "system",
-        });
     });
 </script>
 
@@ -337,28 +386,30 @@
     {/if}
 
     <div id="simulator">
-        <svg viewBox="0 0 100 100" width="100%" height="100%">
-            {#if scene}
-                {#each scene.terrain as row, i}
-                    {#each row as col, j}
-                        <rect
-                            x={i - (col / 4 + 0.1) / 2}
-                            y={j - (col / 4 + 0.1) / 2}
-                            height={col / 4 + 0.1}
-                            width={col / 4 + 0.1}
-                        />
-                    {/each}
+        <svg
+            viewBox="0 0 100 100"
+            width="100%"
+            height="100%"
+            preserveAspectRatio="xMidYMid meet"
+        >
+            {#each scene.terrain as row, i}
+                {#each row as col, j}
+                    <rect
+                        x={i - (col / 4 + 0.1) / 2 + 0.5}
+                        y={j - (col / 4 + 0.1) / 2 + 0.5}
+                        height={col / 4 + 0.1}
+                        width={col / 4 + 0.1}
+                    />
                 {/each}
-            {/if}
+            {/each}
 
-            {#if gameState && scene}
+            {#if gameState && scene.cfg}
                 {#each gameState.unit as unit, i}
-                    <!-- <circle cx={unit.x} cy={unit.y} r="1" fill="var(--blue)" /> -->
                     <circle
                         cx={unit.x}
                         cy={unit.y}
                         r="1"
-                        fill={`var(--${scene.teams[i] === 0 ? "blue" : "red"})`}
+                        fill={`var(--${scene.cfg.teams[i] === 0 ? "blue" : "red"})`}
                     />
                 {/each}
             {/if}
@@ -366,36 +417,42 @@
     </div>
 
     <div id="controler">
-        <!-- chat history -->
-        {#each messages as message}
-            {#if message.user === "system"}
-                <div class="system">{message.text}</div>
-            {:else}
-                <div class="person">{message.text}</div>
-            {/if}
-        {/each}
-
-        <!-- chat input -->
-        <form onsubmit={handleSubmit}>
-            <div class="input-container">
-                <input
-                    type="text"
-                    id="messageInput"
-                    placeholder="Type command (| i, | r, | s, | c, | h) or press Enter for step"
-                    onkeydown={handleKeydown}
-                    oninput={handleInput}
-                />
-            </div>
-        </form>
-
-        <!-- log history -->
-        <div class="log-history">
-            {#each logs as log}
-                <div class="log-entry">
-                    <span class="log-time">[{log.time}]</span>
-                    <span class="log-message">{log.message}</span>
-                </div>
+        <!-- chat history - will grow/shrink based on available space -->
+        <div class="chat-history">
+            {#each messages as message}
+                {#if message.user === "system"}
+                    <div class="system">{message.text}</div>
+                {:else}
+                    <div class="person">{message.text}</div>
+                {/if}
             {/each}
+        </div>
+
+        <!-- Fixed elements at the bottom -->
+        <div class="bottom-section">
+            <!-- chat input -->
+            <form onsubmit={handleSubmit} autocomplete="off">
+                <div class="input-container">
+                    <input
+                        type="text"
+                        id="messageInput"
+                        placeholder="Type command (| i, | r, | s, | c, | h) or press Enter for step"
+                        onkeydown={handleKeydown}
+                        oninput={handleInput}
+                        autocomplete="off"
+                    />
+                </div>
+            </form>
+
+            <!-- log history -->
+            <div class="log-history">
+                {#each [...logs].reverse() as log}
+                    <div class="log-entry">
+                        <span class="log-time">[{log.time}]</span>
+                        <span class="log-message">{log.message}</span>
+                    </div>
+                {/each}
+            </div>
         </div>
     </div>
 </main>
@@ -403,31 +460,59 @@
 <style>
     .system,
     .person {
-        padding: 0.5rem;
-        margin-bottom: 0.5rem;
-        border-radius: 0.25rem;
+        padding: 0.75rem;
+        margin-bottom: 1rem;
+        border-radius: 0.5rem;
         max-width: 80%;
         white-space: pre-wrap;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     }
 
     .system {
-        background-color: #f0f0f0;
         align-self: flex-start;
+        background-color: #f0f0f0;
+        border-bottom-left-radius: 0.25rem;
     }
 
     .person {
-        background-color: #e0f0ff;
         align-self: flex-end;
         margin-left: auto;
+        background-color: #e3f2fd;
+        border-bottom-right-radius: 0.25rem;
     }
 
-    /* Container for messages */
-    #controler {
+    @media (prefers-color-scheme: dark) {
+        .system {
+            background-color: #2d2d2d;
+        }
+
+        .person {
+            background-color: #1a3a5f;
+        }
+    }
+
+    /* Chat history will grow/shrink based on available space */
+    .chat-history {
+        flex: 1; /* Take up available space */
+        overflow-y: auto;
+        margin-bottom: 1rem;
         display: flex;
         flex-direction: column;
+        /* Calculate available height (container height minus input and logs) */
+        min-height: 0; /* Allow it to shrink below content size if needed */
     }
 
-    /* Optional: Add some style to the input container */
+    /* Bottom section contains input and logs, fixed at bottom */
+    .bottom-section {
+        margin-top: auto; /* Push to the bottom */
+        flex-shrink: 0; /* Don't allow this to shrink */
+    }
+
+    /* Input styling */
+    form {
+        flex-shrink: 0; /* Don't allow form to shrink */
+    }
+
     .input-container {
         display: flex;
         margin-top: 1rem;
@@ -436,52 +521,110 @@
 
     .input-container input {
         flex-grow: 1;
-        padding: 0.5rem;
-        border-radius: 4px 0 0 4px;
-        border: 1px solid #ccc;
+        padding: 0.75rem 1rem;
+        border-radius: 4px;
+        border: 2px solid #ccc;
+        font-size: 1rem;
+        transition: border-color 0.3s ease;
+    }
+
+    .input-container input:focus {
+        outline: none;
+        border-color: var(--blue);
+        box-shadow: 0 0 0 2px rgba(40, 53, 147, 0.1);
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .input-container input {
+            background-color: #333;
+            border-color: #555;
+            color: white;
+        }
+
+        .input-container input:focus {
+            border-color: #5c6bc0;
+            box-shadow: 0 0 0 2px rgba(92, 107, 192, 0.2);
+        }
     }
 
     .container {
         width: 100%;
         height: 100vh; /* Full viewport height */
         display: flex; /* Create a flex container for columns */
-        font-family: sans-serif;
         overflow: hidden; /* Prevent scrolling */
+        padding: 16px; /* Add padding around the whole container */
+        box-sizing: border-box; /* Include padding in the width/height calculation */
+        gap: 16px; /* Add gap between simulator and controller */
+        align-items: center; /* Center items vertically */
     }
 
     #simulator {
-        height: 100%; /* Full height */
+        height: calc(
+            100vh - 32px
+        ); /* Exactly viewport height minus container padding */
         aspect-ratio: 1/1; /* Keep it square */
-        border: 1px solid; /* Add a border */
-        /* background-color: #f0f0f0; /* Optional: just to visualize */
+        border: 2px solid; /* Add a solid border */
+        overflow: hidden; /* Keep contents inside the border */
+        border-radius: 4px; /* Slightly rounded corners */
+        box-sizing: border-box; /* Include border in the height calculation */
     }
 
     #controler {
         flex: 1; /* Take up remaining space */
-        height: 100%; /* Full height */
+        height: calc(
+            100vh - 32px
+        ); /* Exactly viewport height minus container padding */
         overflow-y: auto; /* Allow scrolling if content overflows */
-        padding: 10px; /* Optional: add some padding */
-        border: 1px solid; /* Add a border */
-        /* background-color: #e0e0e0; /* Optional: just to visualize */
+        border: 2px solid; /* Add a solid border */
+        padding: 12px; /* Add some padding inside the controller */
+        box-sizing: border-box; /* Include padding and border in the height calculation */
+        border-radius: 4px; /* Slightly rounded corners */
+        display: flex;
+        flex-direction: column;
     }
 
     .error {
-        /* background-color: #ffdddd; */
-        /* color: #990000; */
-        padding: 0.5rem;
+        padding: 0.75rem;
         margin: 1rem 0;
         border-radius: 4px;
+        background-color: #ffebee;
+        color: #c62828;
+        border-left: 4px solid #c62828;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .error {
+            background-color: rgba(198, 40, 40, 0.2);
+            color: #ef9a9a;
+        }
+    }
+
+    .log-history {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        border-radius: 4px;
+        background-color: #f5f5f5;
+        overflow-y: auto;
+        height: 300px; /* Fixed height of 300px */
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .log-history {
+            background-color: #1e1e1e;
+        }
     }
 
     .log-entry {
         margin-bottom: 0.25rem;
         font-family: monospace;
         font-size: 0.85rem;
+        line-height: 1.5;
     }
 
     .log-time {
         color: #666;
         margin-right: 0.5rem;
+        font-weight: bold;
     }
 
     .log-message {

@@ -14,8 +14,12 @@ export interface Unit {
 
 // Game state structures
 export interface Scene {
-    place: string;
     terrain: number[][];
+    cfg?: Cfg;
+}
+
+export interface Cfg {
+    place: string;
     size: number;
     teams: number[];
 }

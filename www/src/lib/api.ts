@@ -49,10 +49,8 @@ export async function init(place: string): Promise<InitResponse> {
         return {
             game_id: data.game_id,
             scene: {
-                place: data.place,
                 terrain: data.terrain,
-                size: data.size,
-                teams: data.teams,
+                cfg: { place: data.place, size: data.size, teams: data.teams },
             },
         };
     } catch (error) {
