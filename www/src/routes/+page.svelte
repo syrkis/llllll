@@ -2,21 +2,12 @@
     import { onMount } from "svelte";
     import { init, reset, step, close } from "../lib/api";
     import { API_BASE_URL } from "../lib/utils";
-    import type { State, Unit } from "../lib/types";
+    import type { LogEntry, ChatEntry, State, Scene } from "../lib/types";
 
     // Define types for our app state
-    interface LogEntry {
-        time: string;
-        message: string;
-    }
-
-    interface Message {
-        text: string;
-        user: "person" | "system";
-    }
 
     // Convert messages to use $state for reactivity
-    let messages = $state<Message[]>([
+    let messages = $state<ChatEntry[]>([
         {
             text: "Welcome! Type '| help' for available commands.",
             user: "system",
@@ -24,23 +15,49 @@
     ]);
     let gameId = $state<string | null>(null);
     let gameState = $state<State | null>(null);
+    let scene = $state<Scene | null>(null);
     let logs = $state<LogEntry[]>([]);
     let error = $state<string | null>(null);
     let loading = $state(false);
+
+    // Command history implementation
+    let commandHistory = $state<string[]>([]);
+    let historyIndex = $state<number>(-1);
+
+    // Command map for aliases/shortcuts (first letter shortcuts)
+    const commandAliases = {
+        i: "init",
+        r: "reset",
+        s: "step",
+        c: "close",
+        h: "help",
+    };
 
     // Log function to track API calls and results
     function addLog(message: string): void {
         logs = [...logs, { time: new Date().toLocaleTimeString(), message }];
     }
 
-    function addMessage(message: Message): void {
+    function addMessage(message: ChatEntry): void {
         messages = [...messages, message];
     }
 
-    // Handles command processing for commands starting with |
+    // Resolve command alias to full command
+    function resolveCommand(cmd: string): string {
+        // If it's a single character and we have an alias for it
+        if (cmd.length === 1 && cmd in commandAliases) {
+            return commandAliases[cmd as keyof typeof commandAliases];
+        }
+        return cmd;
+    }
+
+    // Process a single command
     async function processCommand(command: string): Promise<void> {
         // Remove the leading | and trim whitespace
-        const cmd = command.substring(1).trim().toLowerCase();
+        const cmdRaw = command.substring(1).trim().toLowerCase();
+
+        // Resolve any command aliases
+        const cmd = resolveCommand(cmdRaw);
 
         switch (cmd) {
             case "init":
@@ -63,19 +80,37 @@
                 addMessage({
                     text:
                         "Available commands:\n" +
-                        "| init - Initialize new game\n" +
-                        "| reset - Reset current game\n" +
-                        "| step - Advance game state\n" +
-                        "| close - Close current game\n" +
-                        "| help - Show available commands",
+                        "| init (i) - Initialize new game\n" +
+                        "| reset (r) - Reset current game\n" +
+                        "| step (s) - Advance game state\n" +
+                        "| close (c) - Close current game\n" +
+                        "| help (h) - Show available commands\n\n" +
+                        "You can use the first letter as shortcut (| i, | r, | s, | c, | h)\n" +
+                        "Press Enter without command to run step\n" +
+                        "Chain commands with multiple bars (| i | r | s)",
                     user: "system",
                 });
                 break;
             default:
                 addMessage({
-                    text: `Unknown command: '${cmd}'. Type '| help' for available commands.`,
+                    text: `Unknown command: '${cmdRaw}'. Type '| help' for available commands.`,
                     user: "system",
                 });
+        }
+    }
+
+    // Process multiple commands (for chaining)
+    async function processCommands(commandText: string): Promise<void> {
+        // Split by | and filter out empty segments
+        const commands = commandText
+            .split("|")
+            .map((cmd) => cmd.trim())
+            .filter((cmd) => cmd.length > 0)
+            .map((cmd) => `|${cmd}`); // Add back the | prefix for processing
+
+        // Process each command sequentially
+        for (const cmd of commands) {
+            await processCommand(cmd);
         }
     }
 
@@ -87,21 +122,37 @@
         ) as HTMLInputElement;
         const messageText = messageInput.value.trim();
 
-        if (messageText) {
-            // Add the message to the chat
+        // If empty message, run step command
+        if (!messageText) {
             addMessage({
-                text: messageText,
+                text: "| step",
                 user: "person",
             });
-
-            // Check if this is a command (starts with |)
-            if (messageText.startsWith("|")) {
-                await processCommand(messageText);
-            }
-
-            // Clear the input field
-            messageInput.value = "";
+            await stepGame();
+            addMessage({ text: "Game stepped", user: "system" });
+            return;
         }
+
+        // Add the message to the chat
+        addMessage({
+            text: messageText,
+            user: "person",
+        });
+
+        // If command, add to history
+        if (messageText.startsWith("|")) {
+            // Add to command history
+            commandHistory = [...commandHistory, messageText];
+            historyIndex = -1;
+        }
+
+        // Check if this is a command (starts with |)
+        if (messageText.startsWith("|")) {
+            await processCommands(messageText);
+        }
+
+        // Clear the input field
+        messageInput.value = "";
     }
 
     // Initialize a new game
@@ -110,8 +161,14 @@
         error = null;
         try {
             addLog("Initializing game for Copenhagen, Denmark...");
-            gameId = await init("Copenhagen, Denmark");
+            const initResponse = await init("Copenhagen, Denmark");
+            gameId = initResponse.game_id;
+            scene = initResponse.scene;
+            // console.log();
             addLog(`Game initialized with ID: ${gameId}`);
+            addLog(
+                `Terrain data received: ${scene.terrain ? scene.terrain.length : 0} buildings`,
+            );
         } catch (err: unknown) {
             const errorMessage =
                 err instanceof Error ? err.message : String(err);
@@ -168,8 +225,8 @@
             addLog(`Game stepped. Current step: ${gameState.step}`);
 
             // Log number of units
-            if (gameState.units && gameState.units.length > 0) {
-                addLog(`Units in game: ${gameState.units.length}`);
+            if (gameState.unit && gameState.unit.length > 0) {
+                addLog(`Units in game: ${gameState.unit.length}`);
             }
         } catch (err: unknown) {
             const errorMessage =
@@ -197,6 +254,7 @@
             addLog("Game closed successfully.");
             gameId = null;
             gameState = null;
+            scene = null;
         } catch (err: unknown) {
             const errorMessage =
                 err instanceof Error ? err.message : String(err);
@@ -207,9 +265,66 @@
         }
     }
 
+    // Handle auto-adding space after vertical bar and command history navigation
+    function handleKeydown(event: KeyboardEvent): void {
+        const input = event.target as HTMLInputElement;
+
+        // Handle up/down arrows for command history
+        if (event.key === "ArrowUp") {
+            if (
+                commandHistory.length > 0 &&
+                historyIndex < commandHistory.length - 1
+            ) {
+                historyIndex++;
+                input.value =
+                    commandHistory[commandHistory.length - 1 - historyIndex];
+                // Set cursor at the end
+                setTimeout(() => {
+                    input.selectionStart = input.selectionEnd =
+                        input.value.length;
+                }, 0);
+                event.preventDefault();
+            }
+        } else if (event.key === "ArrowDown") {
+            if (historyIndex > 0) {
+                historyIndex--;
+                input.value =
+                    commandHistory[commandHistory.length - 1 - historyIndex];
+            } else if (historyIndex === 0) {
+                historyIndex = -1;
+                input.value = "";
+            }
+            event.preventDefault();
+        }
+    }
+
+    // Auto-add space after vertical bar
+    function handleInput(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const value = input.value;
+        const selectionStart = input.selectionStart || 0;
+
+        if (
+            value.endsWith("|") &&
+            (value.length === 1 || value[value.length - 2] !== "|")
+        ) {
+            // Add a space after the vertical bar
+            input.value = `${value} `;
+            // Position cursor after the inserted space
+            setTimeout(() => {
+                input.selectionStart = input.selectionEnd = selectionStart + 1;
+            }, 0);
+        }
+    }
+
     // Display API Base URL for debugging
     onMount(() => {
         addLog(`API Base URL: ${API_BASE_URL}`);
+        // Update help message to include shortcuts
+        addMessage({
+            text: "Welcome! Type '| h' for available commands and shortcuts.",
+            user: "system",
+        });
     });
 </script>
 
@@ -222,12 +337,32 @@
     {/if}
 
     <div id="simulator">
-        {#if gameState != null}
-            {$inspect(gameState)}
-            {#each gameState.units as unit}
-                <div>{unit.x}, {unit.y}</div>
-            {/each}
-        {/if}
+        <svg viewBox="0 0 100 100" width="100%" height="100%">
+            {#if scene}
+                {#each scene.terrain as row, i}
+                    {#each row as col, j}
+                        <rect
+                            x={i - (col / 4 + 0.1) / 2}
+                            y={j - (col / 4 + 0.1) / 2}
+                            height={col / 4 + 0.1}
+                            width={col / 4 + 0.1}
+                        />
+                    {/each}
+                {/each}
+            {/if}
+
+            {#if gameState && scene}
+                {#each gameState.unit as unit, i}
+                    <!-- <circle cx={unit.x} cy={unit.y} r="1" fill="var(--blue)" /> -->
+                    <circle
+                        cx={unit.x}
+                        cy={unit.y}
+                        r="1"
+                        fill={`var(--${scene.teams[i] === 0 ? "blue" : "red"})`}
+                    />
+                {/each}
+            {/if}
+        </svg>
     </div>
 
     <div id="controler">
@@ -246,8 +381,9 @@
                 <input
                     type="text"
                     id="messageInput"
-                    placeholder="Type message or command (| init, | reset, | step, | close)"
-                    required
+                    placeholder="Type command (| i, | r, | s, | c, | h) or press Enter for step"
+                    onkeydown={handleKeydown}
+                    oninput={handleInput}
                 />
             </div>
         </form>

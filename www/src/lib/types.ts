@@ -1,6 +1,6 @@
 // Basic game types
 export type UnitType = "unit" | "building" | "resource";
-export type CellType = "grass" | "water" | "mountain";
+export type CellType = "grass" | "water" | "empty";
 
 // Game entities
 export interface Unit {
@@ -9,25 +9,20 @@ export interface Unit {
     y: number;
     size: number;
     health: number;
-    type: UnitType;
-}
-
-export interface Cell {
-    x: number;
-    y: number;
-    type: CellType;
+    // type: UnitType;
 }
 
 // Game state structures
 export interface Scene {
-    location: string;
-    terrain: Cell[][];
+    place: string;
+    terrain: number[][];
+    size: number;
+    teams: number[];
 }
 
 export interface State {
     step: number;
-    units: Unit[];
-    pos: number[];
+    unit: Unit[];
 }
 
 // API-related types
@@ -45,4 +40,14 @@ export interface RawState {
 export interface ApiResponse<T> {
     state?: RawState;
     [key: string]: unknown;
+}
+
+export interface LogEntry {
+    time: string;
+    message: string;
+}
+
+export interface ChatEntry {
+    text: string;
+    user: "person" | "system";
 }

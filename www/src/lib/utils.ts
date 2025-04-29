@@ -1,4 +1,4 @@
-import type { CellType, Cell, Unit, RawState, State } from "./types";
+import type { CellType, Unit, RawState, State } from "./types";
 export const API_BASE_URL = "http://localhost:8000";
 
 /**
@@ -51,54 +51,4 @@ export async function apiRequest<T>(
     }
 
     return result;
-}
-
-/**
- * Maps terrain data from numerical values to cell objects
- */
-export function convertTerrain(rawTerrain: number[][]): Cell[][] {
-    const terrainMap: Record<number, CellType> = {
-        0: "water",
-        1: "grass",
-        2: "mountain",
-    };
-
-    return rawTerrain.map((row, y) =>
-        row.map((value, x) => ({
-            x,
-            y,
-            type: terrainMap[value] || "grass",
-        })),
-    );
-}
-
-/**
- * Converts raw unit position data to Unit objects
- */
-export function convertUnits(rawPositions: number[]): Unit[][] {
-    // This would need to be implemented based on the actual data format
-    return rawPositions.map((row, y) =>
-        Array.isArray(row)
-            ? row.map((unit, x) => ({
-                  id: unit.id || Math.floor(Math.random() * 1000),
-                  x,
-                  y,
-                  size: unit.size || 1,
-                  health: unit.health || 100,
-                  type: unit.type || "unit",
-              }))
-            : [],
-    );
-}
-
-/**
- * Transforms raw state data into the application State format
- */
-export function parseState(rawState: RawState): State {
-    const units = convertUnits(rawState.unit_positions);
-    return {
-        units,
-        pos: rawState.unit_positions,
-        step: rawState.step,
-    };
 }

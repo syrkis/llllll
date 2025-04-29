@@ -1,5 +1,5 @@
 place: "Copenhagen, Denmark"
-size: 500
+size: 200
 knn: 5
 num_units: 12
 num_allies: 6

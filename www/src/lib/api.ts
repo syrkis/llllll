@@ -1,12 +1,35 @@
-import type { State, Unit, UnitType } from "./types";
-import { API_BASE_URL, convertTerrain, parseState } from "./utils";
+import type { State, Unit, Scene, UnitType } from "./types";
+import { API_BASE_URL } from "./utils";
+import * as d3 from "d3";
+
+/**
+ * Interface representing raw state data from the API
+ * This matches the Python State dataclass in types.py
+ */
+interface BackendState {
+    coords: number[][];
+    health: number[];
+    step: number;
+    [key: string]: unknown;
+}
+
+/**
+ * Response from the init endpoint
+ */
+export interface InitResponse {
+    game_id: string;
+    scene: Scene;
+    // terrain: number[][];
+    // size: number;
+    // types: number[];
+}
 
 /**
  * Creates a new game based on a location
  * @param place - The location name (e.g., "Copenhagen, Denmark")
- * @returns Promise with the game_id
+ * @returns Promise with the game_id and terrain data
  */
-export async function init(place: string): Promise<string> {
+export async function init(place: string): Promise<InitResponse> {
     try {
         // URL encode the place parameter
         const encodedPlace = encodeURIComponent(place);
@@ -21,8 +44,17 @@ export async function init(place: string): Promise<string> {
         }
 
         const data = await response.json();
+        console.log("noah");
         console.log(data);
-        return data.game_id;
+        return {
+            game_id: data.game_id,
+            scene: {
+                place: data.place,
+                terrain: data.terrain,
+                size: data.size,
+                teams: data.teams,
+            },
+        };
     } catch (error) {
         console.error("Error initializing game:", error);
         throw error;
@@ -54,13 +86,7 @@ export async function reset(game_id: string): Promise<State> {
         }
 
         // Parse the raw state coming from Python/FastAPI to match our TypeScript types
-        return {
-            units: processUnitData(rawState),
-            step: rawState.step || 0,
-            pos: Array.isArray(rawState.unit_position)
-                ? rawState.unit_position
-                : [],
-        };
+        return { unit: processUnitData(rawState), step: rawState.step };
     } catch (error) {
         console.error("Error resetting game:", error);
         throw error;
@@ -90,30 +116,14 @@ export async function step(game_id: string): Promise<State> {
         }
 
         // Parse the raw state coming from Python/FastAPI to match our TypeScript types
-        console.log(rawState);
         return {
-            units: processUnitData(rawState),
+            unit: processUnitData(rawState),
             step: rawState.step || 0,
-            pos: Array.isArray(rawState.unit_position)
-                ? rawState.unit_position
-                : [],
         };
     } catch (error) {
         console.error("Error stepping game:", error);
         throw error;
     }
-}
-
-/**
- * Interface representing raw state data from the API
- * This matches the Python State dataclass in types.py
- */
-interface BackendState {
-    unit_position?: number[];
-    unit_health?: number[];
-    unit_cooldown?: number[];
-    step?: number;
-    [key: string]: unknown;
 }
 
 /**
@@ -123,35 +133,28 @@ interface BackendState {
  */
 function processUnitData(rawState: BackendState): Unit[] {
     // If no unit data is available, return an empty array
-    console.log("noahnoahnoahnoah");
     if (!rawState.coords || !rawState.health) {
-        console.log("XXXXXXX");
         return [];
     }
 
-    // The backend sends unit_position, unit_health, and unit_cooldown as arrays
-    // We need to transform them into our Unit type structure
-    const unitPositions = rawState.coords;
-    const unitHealth = rawState.health;
-    // const unitCooldown = rawState.unit_cooldown || [];
-
-    // Group units by team or other criteria (this will depend on how your data is structured)
-    // For now, we'll assume all units are in one group
-    const units: Unit[] = [];
-
     // Process unit data - exact structure depends on how unit_position is formatted
     // This is a basic implementation that assumes unit_position is a flat array of [x1, y1, x2, y2, ...]
-    if (Array.isArray(unitPositions) && unitPositions.length >= 2) {
-        for (let i = 0; i < unitPositions.length; i++) {
-            units.push({
-                id: i,
-                x: unitPositions[i][0],
-                y: unitPositions[i][1],
-                size: 1, // Default size if not provided
-                health: 100, // Default health if not provided
-                type: "unit" as UnitType, // Default type
-            });
-        }
+    let units: Unit[] = [];
+
+    // Scale the coordinates from 0-128 to 0-100 range using D3
+    const xScale = d3.scaleLinear().domain([0, 200]).range([0, 100]);
+
+    const yScale = d3.scaleLinear().domain([0, 200]).range([0, 100]);
+
+    if (Array.isArray(rawState.coords)) {
+        units = rawState.coords.map((coord, i) => ({
+            id: i,
+            x: xScale(coord[0]),
+            y: yScale(coord[1]),
+            size: 1, // Default size if not provided
+            health: rawState.health[i], // Default health if not provided
+            // type: "unit" as UnitType, // Default type
+        }));
     }
 
     // Return units grouped as required by the frontend State type

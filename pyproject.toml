@@ -17,6 +17,7 @@ ipython = "^8.29.0"
 jupyterlab = "^4.2.5"
 openai = "^1.52.2"
 python-dotenv = "^1.0.1"
+opencv-python = "^4.11.0.86"
 
 [tool.poetry.group.dev.dependencies]
 parabellum = { path = "../parabellum" }

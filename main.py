@@ -8,10 +8,11 @@ from collections import namedtuple
 from functools import partial
 from dataclasses import asdict
 
+import cv2
 import parabellum as pb
-import btc2sim as b2s
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import numpy as np
 from jax import random, tree
 from omegaconf import OmegaConf
 
@@ -57,7 +58,8 @@ def init(place: str):  # should inlcude settings from frontend
     env, scene = pb.env.Env(cfg=cfg), pb.env.scene_fn(cfg)
     step = partial(step_fn, env, scene)
     games[game_id] = Game(env, scene, step, [])  # <- state_seq list
-    return {"game_id": game_id}  # "terrain": scene.terrain.building.tolist()}
+    terrain = cv2.resize(np.array(scene.terrain.building), dsize=(100, 100)).tolist()
+    return {"game_id": game_id, "terrain": terrain, "size": cfg.size, "teams": scene.unit_teams.tolist()}
 
 
 @app.get("/reset/{game_id}")
