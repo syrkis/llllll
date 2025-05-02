@@ -5,15 +5,18 @@
 # Imports
 import uuid
 from collections import namedtuple
-from functools import partial
 from dataclasses import asdict
+from functools import partial
 
+import btc2sim as b2s
 import cv2
+import jax.numpy as jnp
+import numpy as np
 import parabellum as pb
+from einops import repeat
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import numpy as np
-from jax import random, tree
+from jax import random, tree, vmap
 from omegaconf import OmegaConf
 
 # %% Types
@@ -36,16 +39,22 @@ games = {}
 sleep_time = 0.1
 n_steps = 100
 
+cfg = OmegaConf.load("conf.yaml")
+env, scene = pb.env.Env(cfg=cfg), pb.env.scene_fn(cfg)
+rng = random.PRNGKey(0)
+bt = tree.map(lambda x: repeat(x, f"... -> {cfg.num_units} ..."), b2s.dsl.txt2bts(open("bts.txt", "r").readline()))
+gps, targets = b2s.gps.gps_fn(scene, 6, rng)
+
 
 # %% Functions
-def action_fn(env, rng):  # should be in btc2sim
-    coord = random.normal(rng, (env.num_units, 2))
-    shoot = random.bernoulli(rng, 0.5, shape=(env.num_units,))
-    return pb.types.Action(coord=coord, shoot=shoot)
+def action_fn(env, obs, rng):  # should be in btc2sim
+    rngs = random.split(rng, cfg.num_units)
+    aux = vmap(b2s.act.action_fn, in_axes=(0, 0, 0, None, None, None, 0))
+    return tree.map(jnp.squeeze, aux(rngs, obs, bt, env, scene, gps, targets))  # get rid of squeeze.
 
 
-def step_fn(env, scene, state, rng):  # should also be in btc2sim
-    action = action_fn(env, rng)
+def step_fn(env, scene, obs, state, rng):  # should also be in btc2sim
+    action = action_fn(env, obs, rng)
     obs, state = env.step(rng, scene, state, action)
     return action, obs, state
 
@@ -54,8 +63,6 @@ def step_fn(env, scene, state, rng):  # should also be in btc2sim
 @app.get("/init/{place}")
 def init(place: str):  # should inlcude settings from frontend
     game_id = str(uuid.uuid4())
-    cfg = OmegaConf.load("conf.yaml")
-    env, scene = pb.env.Env(cfg=cfg), pb.env.scene_fn(cfg)
     step = partial(step_fn, env, scene)
     games[game_id] = Game(env, scene, step, [])  # <- state_seq list
     terrain = cv2.resize(np.array(scene.terrain.building), dsize=(100, 100)).tolist()
@@ -64,7 +71,7 @@ def init(place: str):  # should inlcude settings from frontend
 
 @app.get("/reset/{game_id}")
 def reset(game_id: str):
-    rng, key = random.split(random.PRNGKey(0))
+    rng, key = random.split(random.PRNGKey(0) if len(games[game_id].step_seq) == 0 else games[game_id].step_seq[-1].rng)
     obs, state = games[game_id].env.reset(rng=key, scene=games[game_id].scene)
     games[game_id].step_seq.append(Step(rng, obs, state, None))
     return {"state": asdict(tree.map(lambda x: x.tolist(), state)) | {"step": len(games[game_id].step_seq)}}
@@ -73,7 +80,8 @@ def reset(game_id: str):
 @app.get("/step/{game_id}")
 def step(game_id: str):
     rng, key = random.split(games[game_id].step_seq[-1].rng)
-    action, obs, state = games[game_id].step_fn(games[game_id].step_seq[-1].state, key)
+    obs, state = games[game_id].step_seq[-1].obs, games[game_id].step_seq[-1].state
+    action, obs, state = games[game_id].step_fn(obs, state, key)
     games[game_id].step_seq.append(Step(rng, obs, state, action))
     return {"state": asdict(tree.map(lambda x: x.tolist(), state)) | {"step": len(games[game_id].step_seq)}}
 
@@ -84,4 +92,6 @@ async def close(game_id: str):
 
 
 ## piece api
+
+
 ## chat api

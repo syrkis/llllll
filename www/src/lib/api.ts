@@ -64,7 +64,7 @@ export async function init(place: string): Promise<InitResponse> {
  * @param game_id - The ID of the game to reset
  * @returns Promise with the game state
  */
-export async function reset(game_id: string): Promise<State> {
+export async function reset(game_id: string, scene: Scene): Promise<State> {
     try {
         const response = await fetch(`${API_BASE_URL}/reset/${game_id}`);
 
@@ -84,7 +84,7 @@ export async function reset(game_id: string): Promise<State> {
         }
 
         // Parse the raw state coming from Python/FastAPI to match our TypeScript types
-        return { unit: processUnitData(rawState), step: rawState.step };
+        return { unit: processUnitData(rawState, scene), step: rawState.step };
     } catch (error) {
         console.error("Error resetting game:", error);
         throw error;
@@ -96,7 +96,7 @@ export async function reset(game_id: string): Promise<State> {
  * @param game_id - The ID of the game to step
  * @returns Promise with the updated game state
  */
-export async function step(game_id: string): Promise<State> {
+export async function step(game_id: string, scene: Scene): Promise<State> {
     try {
         const response = await fetch(`${API_BASE_URL}/step/${game_id}`);
 
@@ -115,7 +115,7 @@ export async function step(game_id: string): Promise<State> {
 
         // Parse the raw state coming from Python/FastAPI to match our TypeScript types
         return {
-            unit: processUnitData(rawState),
+            unit: processUnitData(rawState, scene),
             step: rawState.step || 0,
         };
     } catch (error) {
@@ -129,7 +129,7 @@ export async function step(game_id: string): Promise<State> {
  * @param rawState - The raw state from the API
  * @returns Processed units array matching the frontend types
  */
-function processUnitData(rawState: BackendState): Unit[] {
+function processUnitData(rawState: BackendState, scene: Scene): Unit[] {
     // If no unit data is available, return an empty array
     if (!rawState.coords || !rawState.health) {
         return [];
@@ -140,9 +140,12 @@ function processUnitData(rawState: BackendState): Unit[] {
     let units: Unit[] = [];
 
     // Scale the coordinates from 0-128 to 0-100 range using D3
-    const xScale = d3.scaleLinear().domain([0, 200]).range([0, 100]);
+    if (scene.cfg === undefined) {
+        throw new Error("Scene size is undefined");
+    }
+    const xScale = d3.scaleLinear().domain([0, scene.cfg.size]).range([0, 100]);
 
-    const yScale = d3.scaleLinear().domain([0, 200]).range([0, 100]);
+    const yScale = d3.scaleLinear().domain([0, scene.cfg.size]).range([0, 100]);
 
     if (Array.isArray(rawState.coords)) {
         units = rawState.coords.map((coord, i) => ({

@@ -52,3 +52,21 @@ export async function apiRequest<T>(
 
     return result;
 }
+
+// Command map for aliases/shortcuts (first letter shortcuts)
+const commandAliases = {
+    i: "init",
+    r: "reset",
+    s: "step",
+    c: "close",
+    h: "help",
+};
+
+// Resolve command alias to full command
+export function resolveCommand(cmd: string): string {
+    // If it's a single character and we have an alias for it
+    if (cmd.length === 1 && cmd in commandAliases) {
+        return commandAliases[cmd as keyof typeof commandAliases];
+    }
+    return cmd;
+}

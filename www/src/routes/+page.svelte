@@ -1,24 +1,29 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { init, reset, step, close } from "../lib/api";
-    import { API_BASE_URL } from "../lib/utils";
-    import type { LogEntry, ChatEntry, State, Scene } from "../lib/types";
-
-    // Define types for our app state
+    import { API_BASE_URL, resolveCommand } from "../lib/utils";
+    import type {
+        LogEntry,
+        ChatEntry,
+        State,
+        Scene,
+        Pieces,
+    } from "../lib/types";
 
     // Convert messages to use $state for reactivity
-    let messages = $state<ChatEntry[]>([
-        {
-            text: "Welcome! Type '| help' to see available commands and shortcuts.",
-            user: "system",
-        },
-    ]);
+    let messages = $state<ChatEntry[]>([{ text: "Welcome!", user: "system" }]);
+    let pieces = $state<Pieces>({
+        king: null,
+        queen: null,
+        rook: null,
+        bishop: null,
+        knight: null,
+        pawn: null,
+    });
     let gameId = $state<string | null>(null);
     let gameState = $state<State | null>(null);
     let scene = $state<Scene>({
-        terrain: Array(100)
-            .fill(0)
-            .map(() => Array(100).fill(0)),
+        terrain: [...Array(100)].map(() => Array(100).fill(0)),
     });
     let logs = $state<LogEntry[]>([]);
     let error = $state<string | null>(null);
@@ -28,15 +33,6 @@
     let commandHistory = $state<string[]>([]);
     let historyIndex = $state<number>(-1);
 
-    // Command map for aliases/shortcuts (first letter shortcuts)
-    const commandAliases = {
-        i: "init",
-        r: "reset",
-        s: "step",
-        c: "close",
-        h: "help",
-    };
-
     // Log function to track API calls and results
     function addLog(message: string): void {
         logs = [...logs, { time: new Date().toLocaleTimeString(), message }];
@@ -44,15 +40,6 @@
 
     function addMessage(message: ChatEntry): void {
         messages = [...messages, message];
-    }
-
-    // Resolve command alias to full command
-    function resolveCommand(cmd: string): string {
-        // If it's a single character and we have an alias for it
-        if (cmd.length === 1 && cmd in commandAliases) {
-            return commandAliases[cmd as keyof typeof commandAliases];
-        }
-        return cmd;
     }
 
     // Process a single command
@@ -82,10 +69,8 @@
                 addLog("Game closed");
                 break;
             case "help":
-                // Help is an exception - we do want to show this in the dialog
-                addMessage({
-                    text:
-                        "Available commands:\n" +
+                addLog(
+                    "Available commands:\n" +
                         "| init (i) - Initialize new game\n" +
                         "| reset (r) - Reset current game\n" +
                         "| step (s) - Advance game state\n" +
@@ -94,8 +79,7 @@
                         "You can use the first letter as shortcut (| i, | r, | s, | c, | h)\n" +
                         "Press Enter without command to run step\n" +
                         "Chain commands with multiple bars (| i | r | s)",
-                    user: "system",
-                });
+                );
                 break;
             default:
                 // Log unknown command to logs, not messages
@@ -152,6 +136,9 @@
 
         // Clear the input field
         messageInput.value = "";
+
+        // Remove command mode class when input is cleared
+        messageInput.classList.remove("command-mode");
     }
 
     // Initialize a new game
@@ -193,7 +180,7 @@
         error = null;
         try {
             addLog(`Resetting game ${gameId}...`);
-            gameState = await reset(gameId);
+            gameState = await reset(gameId, scene);
             addLog(`Game reset. Current step: ${gameState.step}`);
 
             // Add more detailed logs instead of system messages
@@ -223,7 +210,7 @@
         error = null;
         try {
             addLog(`Stepping game ${gameId}...`);
-            gameState = await step(gameId);
+            gameState = await step(gameId, scene);
             addLog(`Game stepped. Current step: ${gameState.step}`);
 
             // Log number of units
@@ -301,6 +288,13 @@
                         input.value.length;
                 }, 0);
                 event.preventDefault();
+
+                // Update command mode class
+                if (input.value.trim().startsWith("|")) {
+                    input.classList.add("command-mode");
+                } else {
+                    input.classList.remove("command-mode");
+                }
             }
         } else if (event.key === "ArrowDown") {
             if (historyIndex > 0) {
@@ -312,6 +306,13 @@
                 input.value = "";
             }
             event.preventDefault();
+
+            // Update command mode class
+            if (input.value.trim().startsWith("|")) {
+                input.classList.add("command-mode");
+            } else {
+                input.classList.remove("command-mode");
+            }
         }
     }
 
@@ -320,60 +321,73 @@
         const input = event.target as HTMLInputElement;
         const value = input.value;
         const selectionStart = input.selectionStart || 0;
-        
+
+        // Toggle command-mode class based on if input starts with |
+        if (value.trim().startsWith("|")) {
+            input.classList.add("command-mode");
+        } else {
+            input.classList.remove("command-mode");
+        }
+
         // Only process if the bar character was just typed (cursor position right after a bar)
-        const barJustTyped = 
-            selectionStart > 0 && 
-            value.charAt(selectionStart - 1) === '|';
-            
+        const barJustTyped =
+            selectionStart > 0 && value.charAt(selectionStart - 1) === "|";
+
         if (barJustTyped) {
-            let originalPosition = selectionStart;
+            const originalPosition = selectionStart;
             let newValue = value;
-            let finalCursorPosition;
-            
+            let finalCursorPosition: number;
+
             // Check if we need to add space before the bar (not at start and no space before)
-            let addSpaceBefore = false;
-            if (originalPosition > 1 && value.charAt(originalPosition - 2) !== ' ') {
-                addSpaceBefore = true;
-            }
-            
+            const addSpaceBefore =
+                originalPosition > 1 &&
+                value.charAt(originalPosition - 2) !== " ";
+
             // Always add space after bar
-            newValue = 
-                value.substring(0, originalPosition) + 
-                ' ' + 
-                value.substring(originalPosition);
-                
+            newValue = `${value.substring(0, originalPosition)} ${value.substring(originalPosition)}`;
+
             // Add space before if needed
             if (addSpaceBefore) {
                 // Calculate position of bar after adding the space after
                 const barPosAfterFirstMod = originalPosition;
-                
+
                 // Insert space before the bar
-                newValue = 
-                    newValue.substring(0, barPosAfterFirstMod - 1) + 
-                    ' ' + 
-                    newValue.substring(barPosAfterFirstMod - 1);
-                    
+                newValue = `${newValue.substring(0, barPosAfterFirstMod - 1)} ${newValue.substring(barPosAfterFirstMod - 1)}`;
+
                 // Final cursor position will be after the bar and the space we added
                 finalCursorPosition = originalPosition + 2; // +1 for space before, +1 for space after
             } else {
                 // No space before needed, cursor will be after bar and the space
                 finalCursorPosition = originalPosition + 1; // +1 for space after
             }
-            
+
             // Update the input value
             input.value = newValue;
-            
+
             // Position cursor correctly
             setTimeout(() => {
                 input.selectionStart = input.selectionEnd = finalCursorPosition;
             }, 0);
         }
     }
+    // function grow(node) {
+    //     if (node.getAttribute("r") === "0") {
+    //         setTimeout(() => node.setAttribute("r", "1"), 10);
+    //     }
+    //     return {};
+    // }
 
     // Display API Base URL for debugging
     onMount(() => {
         addLog(`API Base URL: ${API_BASE_URL}`);
+
+        // Initialize command mode for input field if needed
+        const messageInput = document.getElementById(
+            "messageInput",
+        ) as HTMLInputElement;
+        if (messageInput?.value.trim().startsWith("|")) {
+            messageInput.classList.add("command-mode");
+        }
     });
 </script>
 
@@ -395,21 +409,21 @@
             {#each scene.terrain as row, i}
                 {#each row as col, j}
                     <rect
-                        x={i - (col / 4 + 0.1) / 2 + 0.5}
-                        y={j - (col / 4 + 0.1) / 2 + 0.5}
-                        height={col / 4 + 0.1}
-                        width={col / 4 + 0.1}
+                        x={i - (col / 2 + 0.1) / 2 + 0.5}
+                        y={j - (col / 2 + 0.1) / 2 + 0.5}
+                        height={col / 2 + 0.1}
+                        width={col / 2 + 0.1}
                     />
                 {/each}
             {/each}
 
             {#if gameState && scene.cfg}
-                {#each gameState.unit as unit, i}
+                {#each gameState.unit as unit, i (unit.id || i)}
                     <circle
                         cx={unit.x}
                         cy={unit.y}
-                        r="1"
-                        fill={`var(--${scene.cfg.teams[i] === 0 ? "blue" : "red"})`}
+                        r={gameState.step <= 1 ? "0" : "1"}
+                        fill={`var(--${scene.cfg.teams[i] === 0 ? "red" : "blue"})`}
                     />
                 {/each}
             {/if}
@@ -435,6 +449,7 @@
                 <div class="input-container">
                     <input
                         type="text"
+                        class="input-container command-mode"
                         id="messageInput"
                         placeholder="Type command (| i, | r, | s, | c, | h) or press Enter for step"
                         onkeydown={handleKeydown}
@@ -456,178 +471,3 @@
         </div>
     </div>
 </main>
-
-<style>
-    .system,
-    .person {
-        padding: 0.75rem;
-        margin-bottom: 1rem;
-        border-radius: 0.5rem;
-        max-width: 80%;
-        white-space: pre-wrap;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    }
-
-    .system {
-        align-self: flex-start;
-        background-color: #f0f0f0;
-        border-bottom-left-radius: 0.25rem;
-    }
-
-    .person {
-        align-self: flex-end;
-        margin-left: auto;
-        background-color: #e3f2fd;
-        border-bottom-right-radius: 0.25rem;
-    }
-
-    @media (prefers-color-scheme: dark) {
-        .system {
-            background-color: #2d2d2d;
-        }
-
-        .person {
-            background-color: #1a3a5f;
-        }
-    }
-
-    /* Chat history will grow/shrink based on available space */
-    .chat-history {
-        flex: 1; /* Take up available space */
-        overflow-y: auto;
-        margin-bottom: 1rem;
-        display: flex;
-        flex-direction: column;
-        /* Calculate available height (container height minus input and logs) */
-        min-height: 0; /* Allow it to shrink below content size if needed */
-    }
-
-    /* Bottom section contains input and logs, fixed at bottom */
-    .bottom-section {
-        margin-top: auto; /* Push to the bottom */
-        flex-shrink: 0; /* Don't allow this to shrink */
-    }
-
-    /* Input styling */
-    form {
-        flex-shrink: 0; /* Don't allow form to shrink */
-    }
-
-    .input-container {
-        display: flex;
-        margin-top: 1rem;
-        margin-bottom: 1rem;
-    }
-
-    .input-container input {
-        flex-grow: 1;
-        padding: 0.75rem 1rem;
-        border-radius: 4px;
-        border: 2px solid #ccc;
-        font-size: 1rem;
-        transition: border-color 0.3s ease;
-    }
-
-    .input-container input:focus {
-        outline: none;
-        border-color: var(--blue);
-        box-shadow: 0 0 0 2px rgba(40, 53, 147, 0.1);
-    }
-
-    @media (prefers-color-scheme: dark) {
-        .input-container input {
-            background-color: #333;
-            border-color: #555;
-            color: white;
-        }
-
-        .input-container input:focus {
-            border-color: #5c6bc0;
-            box-shadow: 0 0 0 2px rgba(92, 107, 192, 0.2);
-        }
-    }
-
-    .container {
-        width: 100%;
-        height: 100vh; /* Full viewport height */
-        display: flex; /* Create a flex container for columns */
-        overflow: hidden; /* Prevent scrolling */
-        padding: 16px; /* Add padding around the whole container */
-        box-sizing: border-box; /* Include padding in the width/height calculation */
-        gap: 16px; /* Add gap between simulator and controller */
-        align-items: center; /* Center items vertically */
-    }
-
-    #simulator {
-        height: calc(
-            100vh - 32px
-        ); /* Exactly viewport height minus container padding */
-        aspect-ratio: 1/1; /* Keep it square */
-        border: 2px solid; /* Add a solid border */
-        overflow: hidden; /* Keep contents inside the border */
-        border-radius: 4px; /* Slightly rounded corners */
-        box-sizing: border-box; /* Include border in the height calculation */
-    }
-
-    #controler {
-        flex: 1; /* Take up remaining space */
-        height: calc(
-            100vh - 32px
-        ); /* Exactly viewport height minus container padding */
-        overflow-y: auto; /* Allow scrolling if content overflows */
-        border: 2px solid; /* Add a solid border */
-        padding: 12px; /* Add some padding inside the controller */
-        box-sizing: border-box; /* Include padding and border in the height calculation */
-        border-radius: 4px; /* Slightly rounded corners */
-        display: flex;
-        flex-direction: column;
-    }
-
-    .error {
-        padding: 0.75rem;
-        margin: 1rem 0;
-        border-radius: 4px;
-        background-color: #ffebee;
-        color: #c62828;
-        border-left: 4px solid #c62828;
-    }
-
-    @media (prefers-color-scheme: dark) {
-        .error {
-            background-color: rgba(198, 40, 40, 0.2);
-            color: #ef9a9a;
-        }
-    }
-
-    .log-history {
-        margin-top: 1rem;
-        padding: 0.75rem;
-        border-radius: 4px;
-        background-color: #f5f5f5;
-        overflow-y: auto;
-        height: 300px; /* Fixed height of 300px */
-    }
-
-    @media (prefers-color-scheme: dark) {
-        .log-history {
-            background-color: #1e1e1e;
-        }
-    }
-
-    .log-entry {
-        margin-bottom: 0.25rem;
-        font-family: monospace;
-        font-size: 0.85rem;
-        line-height: 1.5;
-    }
-
-    .log-time {
-        color: #666;
-        margin-right: 0.5rem;
-        font-weight: bold;
-    }
-
-    .log-message {
-        word-break: break-word;
-    }
-</style>
