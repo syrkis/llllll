@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { init, reset, step, close, getPieceIndex, PIECE_TYPES, syncMarks } from "../lib/api";
+    import { init, reset, step, close, getPieceIndex, PIECE_TYPES, syncMarks, localSize } from "../lib/api";
     import {
         API_BASE_URL,
         chessSymbols,
@@ -35,7 +35,7 @@
     let gameId = $state<string | null>(null);
     let gameState = $state<State | null>(null);
     let scene = $state<Scene>({
-        terrain: [...Array(100)].map(() => Array(100).fill(0)),
+        terrain: [...Array(localSize)].map(() => Array(localSize).fill(0)),
     });
     let logs = $state<LogEntry[]>([]);
     let error = $state<string | null>(null);
@@ -263,9 +263,9 @@
             gameId = null;
             gameState = null;
             scene = {
-                terrain: Array(100)
+                terrain: Array(localSize)
                     .fill(0)
-                    .map(() => Array(100).fill(0)),
+                    .map(() => Array(localSize).fill(0)),
             };
 
             // Reset all marks to inactive (0,0)
@@ -451,8 +451,8 @@
             // Then synchronize with the backend
             // await syncMarkWithBackend(leftmostMark, [x, y]);
         }
-        if (gameId) {
-            syncMarks(gameId, marks);
+        if (gameId && scene?.cfg) {
+            syncMarks(gameId, marks, scene.cfg.size);
         }
     }
 
@@ -551,8 +551,8 @@
 
             // Clear dragging state
             isDragging = null;
-            if (gameId) {
-                syncMarks(gameId, marks);
+            if (gameId && scene?.cfg) {
+                syncMarks(gameId, marks, scene.cfg.size);
             }
         }
     }

@@ -13,6 +13,8 @@ interface BackendState {
     [key: string]: unknown;
 }
 
+export const localSize = 100;
+
 /**
  * Ordered list of chess piece types that matches the backend's expected order
  */
@@ -44,9 +46,9 @@ export function getPieceIndex(pieceType: string): number {
  */
 export function convertToBackendCoordinates(
     frontendCoords: [number, number],
-    size = 128,
+    size: number,
 ): [number, number] {
-    const scale = d3.scaleLinear().domain([0, 100]).range([0, size]);
+    const scale = d3.scaleLinear().domain([0, localSize]).range([0, size]);
     return [scale(frontendCoords[0]), scale(frontendCoords[1])];
 }
 
@@ -89,8 +91,10 @@ export async function init(place: string): Promise<InitResponse> {
         // console.log("noah");
         // console.log(data);
         // console.log(data.marks);
-        const scale = d3.scaleLinear().domain([0, data.size]).range([0, 100]);
-        // const yScale = d3.scaleLinear().domain([0, data.size]).range([0, 100]);
+        const scale = d3
+            .scaleLinear()
+            .domain([0, data.size])
+            .range([0, localSize]);
 
         // Use a type-safe approach to scale all mark coordinates
         const scaledMarks = PIECE_TYPES.reduce((acc, piece) => {
@@ -197,15 +201,16 @@ function processUnitData(rawState: BackendState, scene: Scene): Unit[] {
     if (scene.cfg === undefined) {
         throw new Error("Scene size is undefined");
     }
-    const xScale = d3.scaleLinear().domain([0, scene.cfg.size]).range([0, 100]);
-
-    const yScale = d3.scaleLinear().domain([0, scene.cfg.size]).range([0, 100]);
+    const scale = d3
+        .scaleLinear()
+        .domain([0, scene.cfg.size])
+        .range([0, localSize]);
 
     if (Array.isArray(rawState.coords)) {
         units = rawState.coords.map((coord, i) => ({
             id: i,
-            x: xScale(coord[0]),
-            y: yScale(coord[1]),
+            x: scale(coord[0]),
+            y: scale(coord[1]),
             size: 1, // Default size if not provided
             health: rawState.health[i], // Default health if not provided
             // type: "unit" as UnitType, // Default type
@@ -238,13 +243,27 @@ export async function close(game_id: string): Promise<void> {
     }
 }
 
-export async function syncMarks(game_id: string, marks: Marks): Promise<void> {
+export async function syncMarks(
+    game_id: string,
+    marks: Marks,
+    size: number,
+): Promise<void> {
     console.log(marks);
-    // Convert marks to a 6x2 array, preserving order of PIECE_TYPES
+
     const marksArray = PIECE_TYPES.map((pieceType) => {
         return marks[pieceType as keyof typeof marks];
     });
+    // Convert frontend coordinates (0-100) to backend coordinates (0-size)
+    const backendMarksArray = marksArray.map((coord) => {
+        const backendScale = d3
+            .scaleLinear()
+            .domain([0, localSize])
+            .range([0, size]);
 
+        return [backendScale(coord[1]), backendScale(coord[0])];
+    });
+
+    // Use the scaled coordinates for the API call
     console.log(marksArray);
     try {
         const response = await fetch(`${API_BASE_URL}/marks/${game_id}`, {
@@ -252,7 +271,7 @@ export async function syncMarks(game_id: string, marks: Marks): Promise<void> {
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify(marksArray), // Send the array of coordinates
+            body: JSON.stringify(backendMarksArray), // Send the array of coordinates
         });
 
         if (!response.ok) {

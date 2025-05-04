@@ -104,6 +104,6 @@ async def close(game_id: str):
 
 @app.post("/marks/{game_id}")
 async def marks(game_id: str, marks: list = Body(...)):
-    gps = b2s.gps.gps_fn(scene, scene.terrain.building.shape[0] - jnp.int32(jnp.array(marks)))
+    gps = b2s.gps.gps_fn(scene, jnp.int32(jnp.array(marks))[:, ::-1])
     games[game_id] = games[game_id]._replace(gps=gps)
     return {"marks": {k: v.tolist() for k, v in zip(i2p, gps.marks)}}
