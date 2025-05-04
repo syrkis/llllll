@@ -56,11 +56,11 @@ export interface ChatEntry {
     user: "person" | "system";
 }
 
-export interface Pieces {
-    king: [number, number] | null;
-    queen: [number, number] | null;
-    rook: [number, number] | null;
-    bishop: [number, number] | null;
-    knight: [number, number] | null;
-    pawn: [number, number] | null;
+export interface Marks {
+    king: [number, number];
+    queen: [number, number];
+    rook: [number, number];
+    bishop: [number, number];
+    knight: [number, number];
+    pawn: [number, number];
 }

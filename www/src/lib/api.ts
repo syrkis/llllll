@@ -1,4 +1,4 @@
-import type { State, Unit, Scene, UnitType } from "./types";
+import type { State, Unit, Scene, Marks, UnitType } from "./types";
 import { API_BASE_URL } from "./utils";
 import * as d3 from "d3";
 
@@ -14,14 +14,56 @@ interface BackendState {
 }
 
 /**
+ * Ordered list of chess piece types that matches the backend's expected order
+ */
+// This order must match the backend's piece order in main.py
+export const PIECE_TYPES = [
+    "king",
+    "queen",
+    "rook", // Note: rook is before bishop in the backend
+    "bishop",
+    "knight",
+    "pawn",
+] as const;
+
+/**
+ * Gets the index of a piece type for API calls
+ * @param pieceType - The type of chess piece
+ * @returns The index (0-5) for the piece or -1 if not found
+ */
+export function getPieceIndex(pieceType: string): number {
+    // Use type assertion to keyof typeof for type safety
+    return PIECE_TYPES.indexOf(pieceType as (typeof PIECE_TYPES)[number]);
+}
+
+/**
+ * Converts frontend coordinates (0-100 scale) to backend coordinates
+ * @param frontendCoords - The coordinates in the frontend scale
+ * @param size - The backend size (usually 128)
+ * @returns The coordinates in the backend scale
+ */
+export function convertToBackendCoordinates(
+    frontendCoords: [number, number],
+    size = 128,
+): [number, number] {
+    const scale = d3.scaleLinear().domain([0, 100]).range([0, size]);
+    return [scale(frontendCoords[0]), scale(frontendCoords[1])];
+}
+
+/**
  * Response from the init endpoint
  */
 export interface InitResponse {
     game_id: string;
     scene: Scene;
-    // terrain: number[][];
-    // size: number;
-    // types: number[];
+    marks: Marks;
+}
+
+/**
+ * Response from the update mark endpoint
+ */
+export interface UpdateMarkResponse {
+    marks: number[][];
 }
 
 /**
@@ -44,14 +86,26 @@ export async function init(place: string): Promise<InitResponse> {
         }
 
         const data = await response.json();
-        console.log("noah");
-        console.log(data);
+        // console.log("noah");
+        // console.log(data);
+        // console.log(data.marks);
+        const scale = d3.scaleLinear().domain([0, data.size]).range([0, 100]);
+        // const yScale = d3.scaleLinear().domain([0, data.size]).range([0, 100]);
+
+        // Use a type-safe approach to scale all mark coordinates
+        const scaledMarks = PIECE_TYPES.reduce((acc, piece) => {
+            const coord = data.marks[piece];
+            acc[piece] = [scale(coord[0]), scale(coord[1])];
+            return acc;
+        }, {} as Marks);
+
         return {
             game_id: data.game_id,
             scene: {
                 terrain: data.terrain,
                 cfg: { place: data.place, size: data.size, teams: data.teams },
             },
+            marks: scaledMarks,
         };
     } catch (error) {
         console.error("Error initializing game:", error);
@@ -183,3 +237,38 @@ export async function close(game_id: string): Promise<void> {
         throw error;
     }
 }
+
+export async function syncMarks(game_id: string, marks: Marks): Promise<void> {
+    console.log(marks);
+    // Convert marks to a 6x2 array, preserving order of PIECE_TYPES
+    const marksArray = PIECE_TYPES.map((pieceType) => {
+        return marks[pieceType as keyof typeof marks];
+    });
+
+    console.log(marksArray);
+    try {
+        const response = await fetch(`${API_BASE_URL}/marks/${game_id}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(marksArray), // Send the array of coordinates
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to sync marks: ${response.statusText}`);
+        }
+    } catch (error) {
+        console.error("Error syncing marks:", error);
+        throw error;
+    }
+}
+
+// await fetch(`${API_BASE_URL}/marks/${game_id}`, {
+// method: "POST",
+// headers: {
+// "Content-Type": "application/json",
+// },
+// body: JSON.stringify(marks),
+// });
+// }

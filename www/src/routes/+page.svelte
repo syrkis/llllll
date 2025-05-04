@@ -1,24 +1,36 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { init, reset, step, close } from "../lib/api";
-    import { API_BASE_URL, resolveCommand } from "../lib/utils";
+    import { init, reset, step, close, getPieceIndex, PIECE_TYPES, syncMarks } from "../lib/api";
+    import {
+        API_BASE_URL,
+        chessSymbols,
+        markOrder,
+        DRAG_THRESHOLD,
+        processCommand,
+        processCommands,
+        getActiveMarks,
+        getInactiveMarks,
+        isMarkActive,
+        screenToSvgCoordinates,
+        formatCommandInput
+    } from "../lib/utils";
     import type {
         LogEntry,
         ChatEntry,
         State,
         Scene,
-        Pieces,
+        Marks,
     } from "../lib/types";
 
     // Convert messages to use $state for reactivity
     let messages = $state<ChatEntry[]>([{ text: "Welcome!", user: "system" }]);
-    let pieces = $state<Pieces>({
-        king: null,
-        queen: null,
-        rook: null,
-        bishop: null,
-        knight: null,
-        pawn: null,
+    let marks = $state<Marks>({
+        king: [0, 0],
+        queen: [0, 0],
+        bishop: [0, 0],
+        knight: [0, 0],
+        rook: [0, 0],
+        pawn: [0, 0]
     });
     let gameId = $state<string | null>(null);
     let gameState = $state<State | null>(null);
@@ -28,10 +40,19 @@
     let logs = $state<LogEntry[]>([]);
     let error = $state<string | null>(null);
     let loading = $state(false);
+    let gameLoopActive = $state(false);
+    let gameLoopInterval: number | null = $state(null);
 
     // Command history implementation
     let commandHistory = $state<string[]>([]);
     let historyIndex = $state<number>(-1);
+    let isDragging = $state<string | null>(null); // Piece being dragged
+    let dragOffsetX = $state<number>(0);
+    let dragOffsetY = $state<number>(0);
+    let justFinishedDragging = $state<boolean>(false); // Track if we just finished dragging
+
+    // Variable to track if we're just starting to drag
+    let dragStartTime = $state<number>(0);
 
     // Log function to track API calls and results
     function addLog(message: string): void {
@@ -42,66 +63,23 @@
         messages = [...messages, message];
     }
 
-    // Process a single command
-    async function processCommand(command: string): Promise<void> {
-        // Remove the leading | and trim whitespace
-        const cmdRaw = command.substring(1).trim().toLowerCase();
+    // Create a handlers object for the command processor
+    const commandHandlers = {
+        initGame,
+        resetGame,
+        stepGame,
+        closeGame,
+        toggleGameLoop
+    };
 
-        // Resolve any command aliases
-        const cmd = resolveCommand(cmdRaw);
-
-        switch (cmd) {
-            case "init":
-                await initGame();
-                // Log to logs but don't add to messages
-                addLog("Game initialized");
-                break;
-            case "reset":
-                await resetGame();
-                addLog("Game reset");
-                break;
-            case "step":
-                await stepGame();
-                addLog("Game stepped");
-                break;
-            case "close":
-                await closeGame();
-                addLog("Game closed");
-                break;
-            case "help":
-                addLog(
-                    "Available commands:\n" +
-                        "| init (i) - Initialize new game\n" +
-                        "| reset (r) - Reset current game\n" +
-                        "| step (s) - Advance game state\n" +
-                        "| close (c) - Close current game\n" +
-                        "| help (h) - Show available commands\n\n" +
-                        "You can use the first letter as shortcut (| i, | r, | s, | c, | h)\n" +
-                        "Press Enter without command to run step\n" +
-                        "Chain commands with multiple bars (| i | r | s)",
-                );
-                break;
-            default:
-                // Log unknown command to logs, not messages
-                addLog(
-                    `Unknown command: '${cmdRaw}'. Type '| help' for available commands.`,
-                );
-        }
+    // Wrapper for processCommand that uses our local handler functions
+    async function handleCommand(command: string): Promise<void> {
+        await processCommand(command, commandHandlers, addLog);
     }
 
-    // Process multiple commands (for chaining)
-    async function processCommands(commandText: string): Promise<void> {
-        // Split by | and filter out empty segments
-        const commands = commandText
-            .split("|")
-            .map((cmd) => cmd.trim())
-            .filter((cmd) => cmd.length > 0)
-            .map((cmd) => `|${cmd}`); // Add back the | prefix for processing
-
-        // Process each command sequentially
-        for (const cmd of commands) {
-            await processCommand(cmd);
-        }
+    // Wrapper for processCommands that uses our local handler functions
+    async function handleCommands(commandText: string): Promise<void> {
+        await processCommands(commandText, commandHandlers, addLog);
     }
 
     // Handle form submission
@@ -124,8 +102,8 @@
             commandHistory = [...commandHistory, messageText];
             historyIndex = -1;
 
-            // Process the command(s)
-            await processCommands(messageText);
+            // Process the command(s) using our wrapper function
+            await handleCommands(messageText);
         } else {
             // If it's not a command, add it to the chat as a regular message
             addMessage({
@@ -150,12 +128,25 @@
             const initResponse = await init("Copenhagen, Denmark");
             gameId = initResponse.game_id;
             scene = initResponse.scene;
-            // console.log();
+
+            // Set the marks from the initial state
+            marks = initResponse.marks;
+
+            // Log detailed information
             addLog(`Game initialized with ID: ${gameId}`);
             addLog(
                 `Terrain data received: ${scene.terrain ? scene.terrain.length : 0} buildings`,
             );
-            // Add more detailed logs instead of system messages
+
+            // Log the initial marks positions
+            const activeMarks = getActiveMarksList();
+
+            if (activeMarks.length > 0) {
+                addLog(`Initial marks set: ${activeMarks.join(', ')}`);
+            } else {
+                addLog("No initial marks set. Click on simulator to place marks.");
+            }
+
             addLog(
                 `Terrain loaded for Copenhagen, Denmark. Use '| reset' to prepare the game.`,
             );
@@ -179,11 +170,17 @@
         loading = true;
         error = null;
         try {
+            // Now reset the game
             addLog(`Resetting game ${gameId}...`);
             gameState = await reset(gameId, scene);
             addLog(`Game reset. Current step: ${gameState.step}`);
 
-            // Add more detailed logs instead of system messages
+            // Count active marks for the log message
+            const activeMarks = getActiveMarksList();
+            if (activeMarks.length > 0) {
+                addLog(`Game reset with ${activeMarks.length} active marks: ${activeMarks.join(', ')}`);
+            }
+
             addLog(
                 `Units placed on the map. Use '| step' or press Enter to advance the simulation.`,
             );
@@ -209,6 +206,8 @@
         loading = true;
         error = null;
         try {
+
+            // Now step the game
             addLog(`Stepping game ${gameId}...`);
             gameState = await step(gameId, scene);
             addLog(`Game stepped. Current step: ${gameState.step}`);
@@ -233,11 +232,19 @@
         }
     }
 
-    // Close the current game
+    // close current game
     async function closeGame(): Promise<void> {
         if (!gameId) {
             addLog("No game to close.");
             return;
+        }
+
+        // If game loop is active, stop it
+        if (gameLoopActive && gameLoopInterval !== null) {
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = null;
+            gameLoopActive = false;
+            addLog("Game loop stopped.");
         }
 
         loading = true;
@@ -245,8 +252,14 @@
         try {
             const currentGameId = gameId;
             addLog(`Closing game ${currentGameId}...`);
+
+            // Count active marks for logging
+            const activeMarksCount = getActiveMarksList().length;
+
             await close(currentGameId);
             addLog("Game closed successfully.");
+
+            // Reset all game state
             gameId = null;
             gameState = null;
             scene = {
@@ -255,9 +268,19 @@
                     .map(() => Array(100).fill(0)),
             };
 
-            // Add informative log instead of system message
+            // Reset all marks to inactive (0,0)
+            marks = {
+                king: [0, 0],
+                queen: [0, 0],
+                bishop: [0, 0],
+                knight: [0, 0],
+                rook: [0, 0],
+                pawn: [0, 0]
+            };
+
+            // Add informative log including mark cleanup
             addLog(
-                `Game ${currentGameId.substring(0, 8)}... closed successfully. Use '| init' to start a new game.`,
+                `Game ${currentGameId.substring(0, 8)}... closed successfully. ${activeMarksCount > 0 ? `${activeMarksCount} marks removed. ` : ''}Use '| init' to start a new game.`
             );
         } catch (err: unknown) {
             const errorMessage =
@@ -269,6 +292,44 @@
         }
     }
 
+    // Toggle the game loop (play/pause)
+    function toggleGameLoop(): void {
+        // Check if we have a game initialized
+        if (!gameId) {
+            addLog("No game to play. Initialize and reset a game first with '| init' and '| reset'.");
+            return;
+        }
+
+        // Toggle the game loop state
+        if (gameLoopActive) {
+            // Pause the game loop
+            if (gameLoopInterval !== null) {
+                clearInterval(gameLoopInterval);
+                gameLoopInterval = null;
+            }
+            gameLoopActive = false;
+            addLog("Game loop paused.");
+        } else {
+            // Start the game loop with 500ms interval
+            gameLoopInterval = setInterval(async () => {
+                try {
+                    await stepGame();
+                } catch (err) {
+                    // If we encounter an error, stop the game loop
+                    if (gameLoopInterval !== null) {
+                        clearInterval(gameLoopInterval);
+                        gameLoopInterval = null;
+                        gameLoopActive = false;
+                        addLog("Game loop stopped due to error.");
+                    }
+                }
+            }, 500) as unknown as number;
+            gameLoopActive = true;
+            addLog("Game loop started (stepping every 500ms). Run '| play' again to pause.");
+        }
+    }
+
+    // Close the current game
     // Handle auto-adding space after vertical bar and command history navigation
     function handleKeydown(event: KeyboardEvent): void {
         const input = event.target as HTMLInputElement;
@@ -329,38 +390,11 @@
             input.classList.remove("command-mode");
         }
 
-        // Only process if the bar character was just typed (cursor position right after a bar)
-        const barJustTyped =
-            selectionStart > 0 && value.charAt(selectionStart - 1) === "|";
+        // Use the utility function to format the command input
+        const { newValue, finalCursorPosition } = formatCommandInput(value, selectionStart);
 
-        if (barJustTyped) {
-            const originalPosition = selectionStart;
-            let newValue = value;
-            let finalCursorPosition: number;
-
-            // Check if we need to add space before the bar (not at start and no space before)
-            const addSpaceBefore =
-                originalPosition > 1 &&
-                value.charAt(originalPosition - 2) !== " ";
-
-            // Always add space after bar
-            newValue = `${value.substring(0, originalPosition)} ${value.substring(originalPosition)}`;
-
-            // Add space before if needed
-            if (addSpaceBefore) {
-                // Calculate position of bar after adding the space after
-                const barPosAfterFirstMod = originalPosition;
-
-                // Insert space before the bar
-                newValue = `${newValue.substring(0, barPosAfterFirstMod - 1)} ${newValue.substring(barPosAfterFirstMod - 1)}`;
-
-                // Final cursor position will be after the bar and the space we added
-                finalCursorPosition = originalPosition + 2; // +1 for space before, +1 for space after
-            } else {
-                // No space before needed, cursor will be after bar and the space
-                finalCursorPosition = originalPosition + 1; // +1 for space after
-            }
-
+        // Only update if the formatting changed something
+        if (newValue !== value) {
             // Update the input value
             input.value = newValue;
 
@@ -377,6 +411,152 @@
     //     return {};
     // }
 
+    // Handle click on the simulator to place marks (removal is handled by handleDragEnd)
+    async function handleSimulatorClick(event: MouseEvent): Promise<void> {
+        // Skip if we're currently dragging or just finished dragging
+        if (isDragging || justFinishedDragging) {
+            event.stopPropagation();
+            return;
+        }
+
+        // Skip if no game is active
+        // if (!gameId) {
+            // addLog("Cannot place mark: No active game. Initialize a game with '| init' first.");
+            // return;
+        // }
+
+        // Get click coordinates relative to the SVG using utility function
+        const svg = event.currentTarget as SVGSVGElement;
+        const [x, y] = screenToSvgCoordinates(event.clientX, event.clientY, svg);
+
+        // We're only using this handler for placing new marks now
+        // Removal is handled by the mark's own drag/click detection
+
+        // Get the leftmost available symbol instead of using the currentMarkIndex
+        const inactiveMarks = getInactiveMarksList();
+
+        // If we have inactive marks, place the leftmost one
+        if (inactiveMarks.length > 0) {
+            // Find the leftmost inactive mark by finding the one with lowest index in markOrder
+            const leftmostMark = inactiveMarks.reduce((leftmost, current) => {
+                const leftmostIndex = markOrder.indexOf(leftmost);
+                const currentIndex = markOrder.indexOf(current);
+                return currentIndex < leftmostIndex ? current : leftmost;
+            });
+
+            // First update locally for immediate UI feedback
+            marks[leftmostMark as keyof Marks] = [x, y];
+            addLog(`Placing ${leftmostMark} at [${x.toFixed(1)}, ${y.toFixed(1)}]...`);
+
+            // Then synchronize with the backend
+            // await syncMarkWithBackend(leftmostMark, [x, y]);
+        }
+        if (gameId) {
+            syncMarks(gameId, marks);
+        }
+    }
+
+    // Wrappers for mark utility functions that pass our local marks state
+    function getActiveMarksList(): string[] {
+        return getActiveMarks(marks);
+    }
+
+    function getInactiveMarksList(): string[] {
+        return getInactiveMarks(marks);
+    }
+
+    function isMarkActivePiece(piece: string): boolean {
+        return isMarkActive(marks, piece);
+    }
+
+    // Variables for dragging functionality
+
+    // Start dragging a mark
+    function handleDragStart(event: MouseEvent, piece: string): void {
+        event.preventDefault();
+        // Find the SVG parent
+        let target = event.currentTarget as Element;
+        while (target && target.tagName !== 'svg') {
+            target = target.parentElement as Element;
+        }
+        const svg = target as SVGSVGElement;
+        if (!svg) return;
+
+        const coords = marks[piece as keyof Marks];
+        if (!coords || coords[0] === 0) return;
+
+        // Record the drag start time to distinguish from clicks
+        dragStartTime = Date.now();
+
+        isDragging = piece;
+
+        // Get current pointer position in SVG coordinates using utility function
+        const [pointerX, pointerY] = screenToSvgCoordinates(event.clientX, event.clientY, svg);
+
+        // Calculate offset from the center of the mark
+        dragOffsetX = coords[0] - pointerX;
+        dragOffsetY = coords[1] - pointerY;
+    }
+
+    // Handle moving a mark being dragged
+    async function handleDragMove(event: MouseEvent): Promise<void> {
+        if (!isDragging) return;
+
+        const svg = event.currentTarget as SVGSVGElement;
+
+        // Calculate new position in SVG coordinates using utility function
+        const [baseX, baseY] = screenToSvgCoordinates(event.clientX, event.clientY, svg);
+        const x = baseX + dragOffsetX;
+        const y = baseY + dragOffsetY;
+
+        // Update mark position locally immediately for responsive UI
+        marks[isDragging as keyof Marks] = [x, y];
+    }
+
+    // End dragging
+    async function handleDragEnd(event: MouseEvent): Promise<void> {
+        if (isDragging) {
+            // Prevent the default event
+            event.preventDefault();
+            event.stopPropagation();
+
+            // Calculate how long the drag/click lasted
+            const dragDuration = Date.now() - dragStartTime;
+
+            // If it was a short interaction, treat it as a click and remove the mark
+            if (dragDuration < DRAG_THRESHOLD) {
+                // Reset the mark position locally (remove it)
+                marks[isDragging as keyof Marks] = [0, 0];
+                addLog(`Removing ${isDragging} mark...`);
+
+                // Sync with backend
+                // await syncMarkWithBackend(isDragging, [0, 0]);
+            } else {
+                // It was a real drag operation
+                // Get the current position of the dragged mark
+                const newPosition = marks[isDragging as keyof Marks];
+                addLog(`Moving ${isDragging} to [${newPosition[0].toFixed(1)}, ${newPosition[1].toFixed(1)}]...`);
+
+                // Sync the new position with backend
+                // await syncMarkWithBackend(isDragging, [newPosition[0], newPosition[1]]);
+
+                // Set the flag to indicate we just finished dragging
+                justFinishedDragging = true;
+
+                // Reset the flag after a short delay
+                setTimeout(() => {
+                    justFinishedDragging = false;
+                }, 100);
+            }
+
+            // Clear dragging state
+            isDragging = null;
+        }
+    }
+
+
+
+
     // Display API Base URL for debugging
     onMount(() => {
         addLog(`API Base URL: ${API_BASE_URL}`);
@@ -388,8 +568,22 @@
         if (messageInput?.value.trim().startsWith("|")) {
             messageInput.classList.add("command-mode");
         }
+
+        // Log available marks
+        addLog(`Available marks: ${markOrder.join(", ")}`);
+
+        // Return a cleanup function to ensure intervals are cleared when component is destroyed
+        return () => {
+            // Clean up any active interval
+            if (gameLoopInterval !== null) {
+                clearInterval(gameLoopInterval);
+                gameLoopInterval = null;
+            }
+        };
     });
 </script>
+
+
 
 <main class="container">
     {#if error}
@@ -400,6 +594,30 @@
     {/if}
 
     <div id="simulator">
+        <!-- Using a semantically interactive element (div with role) for the simulator wrapper -->
+        <div
+            role="button"
+            tabindex="0"
+            aria-label="Simulator - click to place or remove marks"
+            style="width: 100%; height: 100%; padding: 0; border: none; background: none; display: block;"
+            onclick={handleSimulatorClick}
+            onmousemove={handleDragMove}
+            onmouseup={handleDragEnd}
+            onmouseleave={handleDragEnd}
+            onkeydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    const div = e.currentTarget as HTMLDivElement;
+                    const mockEvent = {
+                        currentTarget: div.querySelector('svg'),
+                        clientX: div.getBoundingClientRect().width / 2,
+                        clientY: div.getBoundingClientRect().height / 2,
+                        preventDefault: () => {}
+                    } as unknown as MouseEvent;
+                    handleSimulatorClick(mockEvent);
+                }
+            }}
+        >
         <svg
             viewBox="0 0 100 100"
             width="100%"
@@ -409,8 +627,8 @@
             {#each scene.terrain as row, i}
                 {#each row as col, j}
                     <rect
-                        x={i - (col / 2 + 0.1) / 2 + 0.5}
-                        y={j - (col / 2 + 0.1) / 2 + 0.5}
+                        x={j - (col / 2 + 0.1) / 2 + 0.5}
+                        y={i - (col / 2 + 0.1) / 2 + 0.5}
                         height={col / 2 + 0.1}
                         width={col / 2 + 0.1}
                     />
@@ -420,14 +638,58 @@
             {#if gameState && scene.cfg}
                 {#each gameState.unit as unit, i (unit.id || i)}
                     <circle
-                        cx={unit.x}
-                        cy={unit.y}
+                        cx={unit.y}
+                        cy={unit.x}
                         r={gameState.step <= 1 ? "0" : "1"}
                         fill={`var(--${scene.cfg.teams[i] === 0 ? "red" : "blue"})`}
                     />
                 {/each}
             {/if}
+
+            <!-- Display placed marks with chess symbols -->
+            {#each Object.entries(marks) as [piece, coords]}
+                {#if coords[0] !== 0 && coords[1] !== 0}
+                    <g
+                        class="mark interactive-mark"
+                        transform={`translate(${coords[1]}, ${coords[0]})`}
+                        onmousedown={(e) => {
+                            e.stopPropagation(); // Stop event from bubbling up to SVG
+                            handleDragStart(e, piece);
+                        }}
+                        role="button"
+                        tabindex="0"
+                        onkeydown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                handleDragStart(e as unknown as MouseEvent, piece);
+                            }
+                        }}
+                        aria-label={`Draggable ${piece} piece`}
+                    >
+                        <!-- Large invisible clickable area -->
+                        <circle
+                            cx="0"
+                            cy="0"
+                            r="3"
+                            fill="transparent"
+                            stroke="transparent"
+                        />
+                        <text
+                            x="0"
+                            y="0.7"
+                            text-anchor="middle"
+                            dominant-baseline="middle"
+                            font-size="3.2"
+                            style="user-select: none; pointer-events: none;"
+                        >
+                            {chessSymbols[piece]}
+                        </text>
+                    </g>
+                {/if}
+            {/each}
         </svg>
+        </div>
     </div>
 
     <div id="controler">
@@ -443,6 +705,21 @@
         </div>
 
         <!-- Fixed elements at the bottom -->
+        <div class="marks">
+            <!-- Show all marks in fixed positions with active/inactive state -->
+            <div class="mark-container">
+                {#each markOrder as piece}
+                    {#if !isMarkActivePiece(piece)}
+                        <div class="mark-item" title="Click on the simulator to place this {piece}">
+                            {chessSymbols[piece]}
+                        </div>
+                    {:else}
+                        <div class="mark-item-placeholder" title="{piece} is placed on the simulator. Click on it to remove.">
+                        </div>
+                    {/if}
+                {/each}
+            </div>
+        </div>
         <div class="bottom-section">
             <!-- chat input -->
             <form onsubmit={handleSubmit} autocomplete="off">

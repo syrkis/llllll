@@ -5,7 +5,7 @@
     --dark-blue: #242743;
     --lavender: #e2e3f2;
     --off-white: #f2e3e2;
-    --transition: 500ms ease-in-out;
+    --transition: 500ms ease;
 }
 body {
     margin: 0;
@@ -220,4 +220,63 @@ form {
         /* background-color: #1e1e1e; */
         color: white;
     }
+}
+
+.marks {
+    margin: auto;
+}
+
+/* Styles moved from +page.svelte */
+/* Global styles to prevent text selection */
+main.container {
+    user-select: none; /* Prevent text selection globally */
+}
+
+/* Allow text selection for specific areas like chat history and logs */
+.chat-history, .log-history, .input-container {
+    user-select: text; /* Re-enable text selection for chat and logs */
+}
+
+/* Mark container and items styling */
+.mark-container {
+    display: flex;
+    justify-content: space-between;
+    width: 90%;
+    margin: 0 auto;
+}
+
+.mark-item {
+    font-size: 24px;
+    user-select: none; /* Prevent text selection */
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mark-item-placeholder {
+    width: 30px;
+    height: 30px;
+}
+
+/* Ensure simulator explicitly prevents text selection and focus outlines */
+#simulator {
+    user-select: none;
+}
+
+/* Remove focus outline from simulator SVG */
+#simulator svg {
+    outline: none;
+}
+
+/* Remove focus outline from all elements within the simulator */
+#simulator * {
+    outline: none;
+}
+
+/* Interactive mark styling */
+.interactive-mark {
+    cursor: move;
+    user-select: none;
 }
