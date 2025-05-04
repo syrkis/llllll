@@ -551,6 +551,9 @@
 
             // Clear dragging state
             isDragging = null;
+            if (gameId) {
+                syncMarks(gameId, marks);
+            }
         }
     }
 
