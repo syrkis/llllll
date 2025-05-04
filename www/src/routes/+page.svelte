@@ -323,9 +323,9 @@
                         addLog("Game loop stopped due to error.");
                     }
                 }
-            }, 500) as unknown as number;
+            }, 100) as unknown as number;
             gameLoopActive = true;
-            addLog("Game loop started (stepping every 500ms). Run '| play' again to pause.");
+            addLog("Game loop started (stepping every 100ms). Run '| play' again to pause.");
         }
     }
 

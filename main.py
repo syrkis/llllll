@@ -10,6 +10,8 @@ from functools import partial
 
 import btc2sim as b2s
 import cv2
+from typing import Tuple
+from fastapi import Body
 import jax.numpy as jnp
 import numpy as np
 import parabellum as pb
@@ -20,7 +22,7 @@ from jax import random, tree, vmap
 from omegaconf import OmegaConf
 
 # %% Types
-Game = namedtuple("Game", ["env", "scene", "step_fn", "step_seq"])
+Game = namedtuple("Game", ["rng", "env", "scene", "step_fn", "gps", "step_seq"])
 Step = namedtuple("Step", ["rng", "obs", "state", "action"])
 
 
@@ -41,20 +43,22 @@ n_steps = 100
 
 cfg = OmegaConf.load("conf.yaml")
 env, scene = pb.env.Env(cfg=cfg), pb.env.scene_fn(cfg)
-rng = random.PRNGKey(0)
+scene.terrain.building = b2s.utils.scene_fn(scene.terrain.building)
+rng, key = random.split(random.PRNGKey(0))
 bt = tree.map(lambda x: repeat(x, f"... -> {cfg.num_units} ..."), b2s.dsl.txt2bts(open("bts.txt", "r").readline()))
-gps, targets = b2s.gps.gps_fn(scene, 6, rng)
+i2p = sorted(["king", "queen", "rook", "bishop", "knight", "pawn"])
+p2i = {p: i for i, p in enumerate(i2p)}
 
 
 # %% Functions
-def action_fn(env, obs, rng):  # should be in btc2sim
+def action_fn(env, obs, rng, gps, targets):  # should be in btc2sim
     rngs = random.split(rng, cfg.num_units)
     aux = vmap(b2s.act.action_fn, in_axes=(0, 0, 0, None, None, None, 0))
     return tree.map(jnp.squeeze, aux(rngs, obs, bt, env, scene, gps, targets))  # get rid of squeeze.
 
 
-def step_fn(env, scene, obs, state, rng):  # should also be in btc2sim
-    action = action_fn(env, obs, rng)
+def step_fn(env, scene, obs, state, gps, targets, rng):  # should also be in btc2sim
+    action = action_fn(env, obs, rng, gps, targets)
     obs, state = env.step(rng, scene, state, action)
     return action, obs, state
 
@@ -64,16 +68,21 @@ def step_fn(env, scene, obs, state, rng):  # should also be in btc2sim
 def init(place: str):  # should inlcude settings from frontend
     game_id = str(uuid.uuid4())
     step = partial(step_fn, env, scene)
-    games[game_id] = Game(env, scene, step, [])  # <- state_seq list
+    rng = random.PRNGKey(0)
+    gps = tree.map(jnp.zeros_like, b2s.gps.gps_fn(scene, jnp.int32(jnp.zeros((6, 2)))))
+    games[game_id] = Game([rng], env, scene, step, gps, [])  # <- state_seq list
     terrain = cv2.resize(np.array(scene.terrain.building), dsize=(100, 100)).tolist()
-    return {"game_id": game_id, "terrain": terrain, "size": cfg.size, "teams": scene.unit_teams.tolist()}
+    teams = scene.unit_teams.tolist()
+    marks = {k: v for k, v in zip(i2p, gps.marks.tolist())}
+    return {"game_id": game_id, "terrain": terrain, "size": cfg.size, "teams": teams, "marks": marks}
 
 
 @app.get("/reset/{game_id}")
 def reset(game_id: str):
-    rng, key = random.split(random.PRNGKey(0) if len(games[game_id].step_seq) == 0 else games[game_id].step_seq[-1].rng)
+    rng, key = random.split(games[game_id].rng[-1])
     obs, state = games[game_id].env.reset(rng=key, scene=games[game_id].scene)
     games[game_id].step_seq.append(Step(rng, obs, state, None))
+    games[game_id].rng.append(rng)
     return {"state": asdict(tree.map(lambda x: x.tolist(), state)) | {"step": len(games[game_id].step_seq)}}
 
 
@@ -81,7 +90,9 @@ def reset(game_id: str):
 def step(game_id: str):
     rng, key = random.split(games[game_id].step_seq[-1].rng)
     obs, state = games[game_id].step_seq[-1].obs, games[game_id].step_seq[-1].state
-    action, obs, state = games[game_id].step_fn(obs, state, key)
+    gps = games[game_id].gps
+    targets = jnp.int32(jnp.zeros(env.num_units)) + 3
+    action, obs, state = games[game_id].step_fn(obs, state, gps, targets, key)
     games[game_id].step_seq.append(Step(rng, obs, state, action))
     return {"state": asdict(tree.map(lambda x: x.tolist(), state)) | {"step": len(games[game_id].step_seq)}}
 
@@ -91,7 +102,8 @@ async def close(game_id: str):
     del games[game_id]
 
 
-## piece api
-
-
-## chat api
+@app.post("/marks/{game_id}")
+async def marks(game_id: str, marks: list = Body(...)):
+    gps = b2s.gps.gps_fn(scene, scene.terrain.building.shape[0] - jnp.int32(jnp.array(marks)))
+    games[game_id] = games[game_id]._replace(gps=gps)
+    return {"marks": {k: v.tolist() for k, v in zip(i2p, gps.marks)}}

@@ -5,7 +5,7 @@
     --dark-blue: #242743;
     --lavender: #e2e3f2;
     --off-white: #f2e3e2;
-    --transition: 500ms ease;
+    --transition: 200ms ease-in-out;
 }
 body {
     margin: 0;
@@ -233,7 +233,9 @@ main.container {
 }
 
 /* Allow text selection for specific areas like chat history and logs */
-.chat-history, .log-history, .input-container {
+.chat-history,
+.log-history,
+.input-container {
     user-select: text; /* Re-enable text selection for chat and logs */
 }
 
