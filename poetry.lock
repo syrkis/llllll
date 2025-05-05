@@ -650,7 +650,7 @@ develop = ["pytest", "transforms3d"]
 
 [[package]]
 name = "btc2sim"
-version = "0.0.19"
+version = "0.0.20"
 description = ""
 optional = false
 python-versions = "^3.11,<3.12"
@@ -4383,7 +4383,7 @@ files = [
 
 [[package]]
 name = "parabellum"
-version = "0.6.19"
+version = "0.6.22"
 description = "Parabellum environment for parallel warfare simulation"
 optional = false
 python-versions = "^3.11,<3.12"

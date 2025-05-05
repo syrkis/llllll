@@ -249,7 +249,6 @@ export async function syncMarks(
     size: number,
 ): Promise<void> {
     console.log(marks);
-
     const marksArray = PIECE_TYPES.map((pieceType) => {
         return marks[pieceType as keyof typeof marks];
     });
