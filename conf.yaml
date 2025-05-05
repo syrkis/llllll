@@ -1,14 +1,14 @@
-place: "Tietgenkollegiet, Copenhagen"
+place: "The Pentagon, Pentagon Access Road, Arlington County, Virginia, 20301, United States"
 size: 200
 knn: 5
-num_units: 500
-num_allies: 300
-num_enemies: 200
+num_units: 60
+num_allies: 40
+num_enemies: 20
 counts:
   allies:
-    Infantry: 300
+    Infantry: 40
   enemies:
-    Airplane: 200
+    Airplane: 20
 
 types:
   - name: "Infantry"

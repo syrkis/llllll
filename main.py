@@ -43,11 +43,12 @@ n_steps = 100
 
 cfg = OmegaConf.load("conf.yaml")
 env, scene = pb.env.Env(cfg=cfg), pb.env.scene_fn(cfg)
-scene.terrain.building = b2s.utils.scene_fn(scene.terrain.building)
+# scene.terrain.building = b2s.utils.scene_fn(scene.terrain.building)
 rng, key = random.split(random.PRNGKey(0))
 bt = tree.map(lambda x: repeat(x, f"... -> {cfg.num_units} ..."), b2s.dsl.txt2bts(open("bts.txt", "r").readline()))
 i2p = sorted(["king", "queen", "rook", "bishop", "knight", "pawn"])
 p2i = {p: i for i, p in enumerate(i2p)}
+targets = jnp.int32(jnp.arange(6).repeat(env.num_units // 6)).flatten()
 
 
 # %% Functions
@@ -91,7 +92,6 @@ def step(game_id: str):
     rng, key = random.split(games[game_id].step_seq[-1].rng)
     obs, state = games[game_id].step_seq[-1].obs, games[game_id].step_seq[-1].state
     gps = games[game_id].gps
-    targets = jnp.int32(jnp.zeros(env.num_units)) + 3
     action, obs, state = games[game_id].step_fn(obs, state, gps, targets, key)
     games[game_id].step_seq.append(Step(rng, obs, state, action))
     return {"state": asdict(tree.map(lambda x: x.tolist(), state)) | {"step": len(games[game_id].step_seq)}}
@@ -105,5 +105,8 @@ async def close(game_id: str):
 @app.post("/marks/{game_id}")
 async def marks(game_id: str, marks: list = Body(...)):
     gps = b2s.gps.gps_fn(scene, jnp.int32(jnp.array(marks))[:, ::-1])
+    # struct = tree.structure(gps)
+    # print(tree.structure(tree.transpose(struct, None, gps)))
+    # gps = tree.map(lambda x: x * ~(gps.marks == 0).all(), gps)
     games[game_id] = games[game_id]._replace(gps=gps)
     return {"marks": {k: v.tolist() for k, v in zip(i2p, gps.marks)}}

@@ -117,6 +117,9 @@
 
         // Remove command mode class when input is cleared
         messageInput.classList.remove("command-mode");
+
+        // Ensure input stays focused
+        messageInput.focus();
     }
 
     // Initialize a new game
@@ -454,6 +457,9 @@
         if (gameId && scene?.cfg) {
             syncMarks(gameId, marks, scene.cfg.size);
         }
+
+        // Refocus the input field
+        focusInput();
     }
 
     // Wrappers for mark utility functions that pass our local marks state
@@ -554,11 +560,24 @@
             if (gameId && scene?.cfg) {
                 syncMarks(gameId, marks, scene.cfg.size);
             }
+
+            // Refocus the input field
+            focusInput();
         }
     }
 
 
 
+
+    // Utility function to focus the input field
+    function focusInput(): void {
+        setTimeout(() => {
+            const messageInput = document.getElementById("messageInput") as HTMLInputElement;
+            if (messageInput) {
+                messageInput.focus();
+            }
+        }, 0);
+    }
 
     // Display API Base URL for debugging
     onMount(() => {
@@ -574,6 +593,9 @@
 
         // Log available marks
         addLog(`Available marks: ${markOrder.join(", ")}`);
+
+        // Focus the input field when component loads
+        focusInput();
 
         // Return a cleanup function to ensure intervals are cleared when component is destroyed
         return () => {
@@ -618,6 +640,7 @@
                         preventDefault: () => {}
                     } as unknown as MouseEvent;
                     handleSimulatorClick(mockEvent);
+                    focusInput();
                 }
             }}
         >
@@ -669,6 +692,7 @@
                             }
                         }}
                         aria-label={`Draggable ${piece} piece`}
+                        data-tooltip={piece}
                     >
                         <!-- Large invisible clickable area -->
                         <circle
@@ -683,9 +707,9 @@
                             y="0.7"
                             text-anchor="middle"
                             dominant-baseline="middle"
-                            font-size="3.2"
-                            style="user-select: none; pointer-events: none;"
-                        >
+                            font-size="7"
+                            >
+                            <title>{piece}</title>
                             {chessSymbols[piece]}
                         </text>
                     </g>
@@ -695,9 +719,9 @@
         </div>
     </div>
 
-    <div id="controler">
+    <div id="controler" onclick={focusInput} onkeydown={(e) => e.key === 'Enter' && focusInput()} role="region" aria-label="Control panel">
         <!-- chat history - will grow/shrink based on available space -->
-        <div class="chat-history">
+        <div class="chat-history" onclick={focusInput} onkeydown={(e) => e.key === 'Enter' && focusInput()} role="log" aria-label="Chat messages">
             {#each messages as message}
                 {#if message.user === "system"}
                     <div class="system">{message.text}</div>
@@ -708,16 +732,16 @@
         </div>
 
         <!-- Fixed elements at the bottom -->
-        <div class="marks">
+        <div class="marks" onclick={focusInput} onkeydown={(e) => e.key === 'Enter' && focusInput()} role="toolbar" aria-label="Available pieces" tabindex="0">
             <!-- Show all marks in fixed positions with active/inactive state -->
             <div class="mark-container">
                 {#each markOrder as piece}
                     {#if !isMarkActivePiece(piece)}
-                        <div class="mark-item" title="Click on the simulator to place this {piece}">
+                        <div class="mark-item" title="{piece}">
                             {chessSymbols[piece]}
                         </div>
                     {:else}
-                        <div class="mark-item-placeholder" title="{piece} is placed on the simulator. Click on it to remove.">
+                        <div class="mark-item-placeholder" title="{piece}">
                         </div>
                     {/if}
                 {/each}
@@ -735,12 +759,13 @@
                         onkeydown={handleKeydown}
                         oninput={handleInput}
                         autocomplete="off"
+                        autofocus
                     />
                 </div>
             </form>
 
             <!-- log history -->
-            <div class="log-history">
+            <div class="log-history" onclick={focusInput} onkeydown={(e) => e.key === 'Enter' && focusInput()} role="log" aria-label="System log">
                 {#each [...logs].reverse() as log}
                     <div class="log-entry">
                         <span class="log-time">[{log.time}]</span>

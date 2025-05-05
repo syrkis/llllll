@@ -224,6 +224,7 @@ form {
 
 .marks {
     margin: auto;
+    width: 95%;
 }
 
 /* Styles moved from +page.svelte */
@@ -243,23 +244,23 @@ main.container {
 .mark-container {
     display: flex;
     justify-content: space-between;
-    width: 90%;
+    width: 100%;
     margin: 0 auto;
 }
 
 .mark-item {
-    font-size: 24px;
+    font-size: 3.2rem;
     user-select: none; /* Prevent text selection */
-    width: 30px;
-    height: 30px;
+    width: 50px;
+    height: 50px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .mark-item-placeholder {
-    width: 30px;
-    height: 30px;
+    width: 50px;
+    height: 50px;
 }
 
 /* Ensure simulator explicitly prevents text selection and focus outlines */
@@ -279,6 +280,57 @@ main.container {
 
 /* Interactive mark styling */
 .interactive-mark {
-    cursor: move;
     user-select: none;
+    position: relative;
+    font-size: 12pt;
+}
+
+.interactive-mark:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: -20px;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Styled tooltips for chess symbols */
+.mark-item {
+    position: relative;
+}
+
+.mark-item:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Arrow for tooltip */
+.mark-item:hover::before {
+    content: "";
+    position: absolute;
+    bottom: calc(100% - 5px);
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 10px;
+    height: 10px;
+    background-color: rgba(0, 0, 0, 0.8);
+    pointer-events: none;
+    z-index: 9;
 }
