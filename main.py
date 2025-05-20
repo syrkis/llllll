@@ -7,6 +7,8 @@ import uuid
 from collections import namedtuple
 from dataclasses import asdict
 from functools import partial
+import jraph
+
 
 import btc2sim as b2s
 import cv2
@@ -106,4 +108,4 @@ async def close(game_id: str):
 async def marks(game_id: str, marks: list = Body(...)):
     gps = b2s.gps.gps_fn(scene, jnp.int32(jnp.array(marks))[:, ::-1])
     games[game_id] = games[game_id]._replace(gps=gps)
-    return {"marks": {k: v.tolist() for k, v in zip(i2p, gps.marks)}}
+s)
