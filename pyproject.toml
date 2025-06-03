@@ -20,16 +20,14 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "parabellum",
-    "btc2sim",
-]
+dev = ["parabellum", "btc2sim", "esch"]
 
 [tool.uv]
 
 [tool.uv.sources]
 parabellum = { path = "../parabellum" }
 btc2sim = { path = "../btc2sim" }
+esch = { path = "../../esch" }
 
 [build-system]
 requires = ["hatchling"]

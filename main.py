@@ -4,28 +4,40 @@
 
 # Imports
 import uuid
-from collections import namedtuple
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from functools import partial
-import jraph
-
+from typing import List
 
 import btc2sim as b2s
 import cv2
-from typing import Tuple
-from fastapi import Body
 import jax.numpy as jnp
 import numpy as np
 import parabellum as pb
 from einops import repeat
-from fastapi import FastAPI
+from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from jax import random, tree, vmap
-from omegaconf import OmegaConf
+from jaxtyping import Array
+from omegaconf import DictConfig
+
 
 # %% Types
-Game = namedtuple("Game", ["rng", "env", "scene", "step_fn", "gps", "step_seq"])
-Step = namedtuple("Step", ["rng", "obs", "state", "action"])
+@dataclass
+class Step:
+    rng: Array
+    obs: pb.types.Obs
+    state: pb.types.State
+    action: pb.types.Action | None
+
+
+@dataclass
+class Game:
+    rng: Array
+    env: pb.env.Env
+    scene: pb.env.Scene
+    step_fn: pb.env.step_fn
+    gps: b2s.types.Compass
+    step_seq: List[Step]
 
 
 # Configure CORS
@@ -38,32 +50,39 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
+bt_strs = """
+F ( S ( C in_range enemy |> A shoot random ) |> A move target )
+"""
+
 # %% Globals
 games = {}
 sleep_time = 0.1
 n_steps = 100
 
-cfg = OmegaConf.load("conf.yaml")
+# Config
+loc = dict(place="Palazzo della Civiltà Italiana, Rome, Italy", size=64)
+red = dict(infantry=2, armor=0, airplane=0)
+blue = dict(infantry=2, armor=0, airplane=0)
+cfg = DictConfig(dict(steps=100, knn=4, blue=blue, red=red) | loc)
+
 env, scene = pb.env.Env(cfg=cfg), pb.env.scene_fn(cfg)
-# scene.terrain.building = b2s.utils.scene_fn(scene.terrain.building)
 rng, key = random.split(random.PRNGKey(0))
 bt = tree.map(lambda x: repeat(x, f"... -> {cfg.num_units} ..."), b2s.dsl.txt2bts(open("bts.txt", "r").readline()))
+bts = b2s.dsl.bts_fn(bt_strs)
+action_fn = vmap(b2s.act.action_fn, in_axes=(0, 0, 0, None, None, None, 0))
+
+
 i2p = sorted(["king", "queen", "rook", "bishop", "knight", "pawn"])
 p2i = {p: i for i, p in enumerate(i2p)}
 targets = jnp.int32(jnp.arange(6).repeat(env.num_units // 6)).flatten()
 
 
-# %% Functions
-def action_fn(env, obs, rng, gps, targets):  # should be in btc2sim
-    rngs = random.split(rng, cfg.num_units)
-    aux = vmap(b2s.act.action_fn, in_axes=(0, 0, 0, None, None, None, 0))
-    return tree.map(jnp.squeeze, aux(rngs, obs, bt, env, scene, gps, targets))  # get rid of squeeze.
-
-
-def step_fn(env, scene, obs, state, gps, targets, rng):  # should also be in btc2sim
-    action = action_fn(env, obs, rng, gps, targets)
+def step_fn(rng, obs, state, plan, gps):
+    rngs = random.split(rng, env.num_units)
+    behavior = b2s.lxm.plan_fn(rng, bts, plan, state, scene)  # perhaps only update plan every m steps
+    action = action_fn(rngs, obs, behavior, env, scene, gps, targets)
     obs, state = env.step(rng, scene, state, action)
-    return action, obs, state
+    return (obs, state), (state, action)
 
 
 # %% End points
@@ -73,7 +92,7 @@ def init(place: str):  # should inlcude settings from frontend
     step = partial(step_fn, env, scene)
     rng = random.PRNGKey(0)
     gps = tree.map(jnp.zeros_like, b2s.gps.gps_fn(scene, jnp.int32(jnp.zeros((6, 2)))))
-    games[game_id] = Game([rng], env, scene, step, gps, [])  # <- state_seq list
+    games[game_id] = Game(rng, env, scene, step, gps, [])  # <- state_seq list
     terrain = cv2.resize(np.array(scene.terrain.building), dsize=(100, 100)).tolist()
     teams = scene.unit_teams.tolist()
     marks = {k: v for k, v in zip(i2p, gps.marks.tolist())}
@@ -108,4 +127,3 @@ async def close(game_id: str):
 async def marks(game_id: str, marks: list = Body(...)):
     gps = b2s.gps.gps_fn(scene, jnp.int32(jnp.array(marks))[:, ::-1])
     games[game_id] = games[game_id]._replace(gps=gps)
-s)
